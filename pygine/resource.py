@@ -31,7 +31,9 @@ class SpriteType(IntEnum):
     NONE = 0
     TEXT = 1
     TITLE = 2
-    PLAYER = 3
+    SELECT = 3
+    PLAYERA = 4
+    PLAYERB = 5
 
 
 class Sprite(PygineObject):
@@ -89,9 +91,14 @@ class Sprite(PygineObject):
             self.__sprite_setup(0, 0, 8, 8)
 
         elif (self.type == SpriteType.TITLE):
-            self.__sprite_setup(0, 0, 128, 32)
-        elif (self.type == SpriteType.PLAYER):
+            self.__sprite_setup(0, 0, 144, 32)
+        elif (self.type == SpriteType.SELECT):
+            self.__sprite_setup(0, 96, 208, 32)
+            
+        elif (self.type == SpriteType.PLAYERA):
             self.__sprite_setup(0, 32, 32, 48)
+        elif (self.type == SpriteType.PLAYERB):
+            self.__sprite_setup(32, 32, 32, 48)
 
         self.__apply_changes_to_sprite()
 

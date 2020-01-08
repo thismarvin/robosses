@@ -128,7 +128,7 @@ class Actor(Kinetic):
 class Player(Actor):
     def __init__(self, x, y):
         super(Player, self).__init__(x, y, 16, 32, 90)
-        self.sprite = Sprite(self.x - 9, self.y - 16, SpriteType.PLAYER)
+        self.sprite = Sprite(self.x, self.y, SpriteType.NONE)
         self.query_result = None
 
         self.jump_height = 16 * 5 + 4
@@ -151,9 +151,18 @@ class Player(Actor):
 
         self.sprite_flipped = False
 
-    def set_location(self, x, y):
-        super(Player, self).set_location(x, y)
-        self.sprite.set_location(self.x - 9, self.y - 16)
+        self.entered_arena = False
+
+    def reset(self):
+        self.velocity = Vector2(0, 0)
+        self.acceleration = Vector2(0, self.gravity)
+
+        self.grounded = False
+        self.jumping = False
+
+    def enter_arena(self):
+        self.reset()
+        self.entered_arena = True
 
     def _update_input(self):
         if pressing(InputType.LEFT) and not pressing(InputType.RIGHT):
@@ -252,6 +261,9 @@ class Player(Actor):
                 self._update_collision_rectangles()
 
     def update(self, delta_time, scene_data):
+        if (not self.entered_arena):
+            return
+
         self._update_input()
 
         super(Player, self).update(delta_time, scene_data)
@@ -274,6 +286,28 @@ class Player(Actor):
             )
         else:
             self.sprite.draw(surface, CameraType.DYNAMIC)
+
+
+class PlayerA(Player):
+    def __init__(self, x, y):
+        super(PlayerA, self).__init__(x, y)
+        self.sprite = Sprite(self.x - 9, self.y - 16, SpriteType.PLAYERA)
+        # Character specific stuff here.
+
+    def set_location(self, x, y):
+        super(PlayerA, self).set_location(x, y)
+        self.sprite.set_location(self.x - 9, self.y - 16)
+
+    def blast_em_logic(self):
+        pass
+
+    def update(self, delta_time, scene_data):
+        self.blast_em_logic()
+
+        super(PlayerA, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        super(PlayerA, self).draw(surface)
 
 
 class Block(Entity):

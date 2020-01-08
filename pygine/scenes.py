@@ -7,15 +7,16 @@ from pygine.maths import Vector2
 from pygine.structures import Quadtree, Bin
 from pygine.transitions import Pinhole, TransitionType
 from pygine.triggers import OnButtonPressTrigger
-from pygine.utilities import Camera
+from pygine.utilities import Camera, Timer
 from random import randint
 
 
 class SceneType(IntEnum):
     MENU = 0
-    BOSSA = 1
-    BOSSB = 2
-    FINALBOSS = 3
+    SELECT = 1
+    BOSSA = 2
+    BOSSB = 3
+    FINALBOSS = 4
 
 
 class SceneManager:
@@ -52,6 +53,7 @@ class SceneManager:
     def __initialize_scenes(self):
         self.__all_scenes = []
         self.__add_scene(Menu())
+        self.__add_scene(Select())
         self.__add_scene(BossA())
         self.__add_scene(BossB())
         self.__add_scene(FinalBoss())
@@ -318,7 +320,6 @@ class Menu(Scene):
     def __init__(self):
         super(Menu, self).__init__()
         self.setup(False)
-        self.relay_actor(Player(16, 16))
 
     def _reset(self):
         self.set_scene_bounds(
@@ -327,7 +328,7 @@ class Menu(Scene):
         self.entities = []
 
         self.sprites = [
-            Sprite((self.scene_bounds.width - 128) / 2,
+            Sprite((self.scene_bounds.width - 144) / 2,
                    (self.scene_bounds.height - 32) / 2, SpriteType.TITLE)
         ]
 
@@ -337,60 +338,147 @@ class Menu(Scene):
         self.triggers = [
             OnButtonPressTrigger(
                 InputType.A,
-                Vector2(
-                    self.scene_bounds.width / 2,
-                    -128
-                ),
+                Vector2(-128, -128),
+                SceneType.SELECT
+            )
+        ]
+
+    def update(self, delta_time):
+        super(Menu, self).update(delta_time)
+
+    def draw(self, surface):
+        super(Menu, self).draw(surface)
+
+
+class Select(Scene):
+    def __init__(self):
+        super(Select, self).__init__()
+        self.setup(False)
+
+        # TEMP
+        self.relay_actor(PlayerA(-128, -128))
+
+    def _reset(self):
+        self.set_scene_bounds(
+            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
+
+        self.entities = []
+        self.sprites = [
+            Sprite((self.scene_bounds.width - 208) / 2,
+                   (self.scene_bounds.height - 32) / 4, SpriteType.SELECT),
+            Sprite((self.scene_bounds.width - 32) / 2,
+                   (self.scene_bounds.height - 48) / 2, SpriteType.PLAYERA),
+        ]
+        self.shapes = []
+
+    def _create_triggers(self):
+        self.triggers = [
+            OnButtonPressTrigger(
+                InputType.A,
+                Vector2(-128, -128),
                 SceneType.BOSSA
             )
         ]
 
+    def update(self, delta_time):
+        super(Select, self).update(delta_time)
 
-class BossA(Scene):
+    def draw(self, surface):
+        super(Select, self).draw(surface)
+
+
+class Boss(Scene):
+    def __init__(self):
+        super(Boss, self).__init__()
+        self.setup(False)
+
+        self.arena_setup = False
+        self.player_released = False
+        self.release_timer = Timer(1000)
+        
+    def _reset(self):
+        self.set_scene_bounds(
+            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
+        self.entities = []
+        self.sprites = []
+        self.shapes = []
+
+    def _create_triggers(self):
+        self.triggers = []
+
+    def _create_arena(self):
+        raise NotImplementedError(
+            "A class that inherits Boss did not implement the _create_arena() method")
+
+    def update(self, delta_time):
+        if (not self.arena_setup):
+            self._create_arena()
+            self.release_timer.start()
+            self.arena_setup = True
+
+        self.release_timer.update(delta_time)
+        if (not self.player_released and self.release_timer.done):
+            self.actor.enter_arena()
+            self.player_released = True
+
+        super(Boss, self).update(delta_time)
+
+    def draw(self, surface):
+        super(Boss, self).draw(surface)
+
+
+class BossA(Boss):
     def __init__(self):
         super(BossA, self).__init__()
-        self.setup(False)
+        self.release_timer = Timer(500)
 
-    def _reset(self):
-        self.set_scene_bounds(
-            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
-        self.entities = [
-            Block(0,self.scene_bounds.height - 16, self.scene_bounds.width, 16)
-        ]
-        self.sprites = []
-        self.shapes = []
+    def _create_arena(self):
+        self.entities.append(
+            Block(0, self.scene_bounds.height -
+                  16, self.scene_bounds.width, 16)
+        )
 
-    def _create_triggers(self):
-        self.triggers = []
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
+
+    def update(self, delta_time):
+        super(BossA, self).update(delta_time)
+
+    def draw(self, surface):
+        super(BossA, self).draw(surface)
 
 
-class BossB(Scene):
+class BossB(Boss):
     def __init__(self):
         super(BossB, self).__init__()
-        self.setup(False)
 
-    def _reset(self):
-        self.set_scene_bounds(
-            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
-        self.entities = []
-        self.sprites = []
-        self.shapes = []
+    def _create_arena(self):
+        self.entities.append(
+            Block(0, self.scene_bounds.height -
+                  16, self.scene_bounds.width, 16)
+        )
 
-    def _create_triggers(self):
-        self.triggers = []
+    def update(self, delta_time):
+        super(BossB, self).update(delta_time)
+
+    def draw(self, surface):
+        super(BossB, self).draw(surface)
 
 
-class FinalBoss(Scene):
+class FinalBoss(Boss):
     def __init__(self):
         super(FinalBoss, self).__init__()
-        self.setup(False)
 
-    def _reset(self):
-        self.set_scene_bounds(
-            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
-        self.entities = []
-        self.sprites = []
-        self.shapes = []
+    def _create_arena(self):
+        self.entities.append(
+            Block(0, self.scene_bounds.height -
+                  16, self.scene_bounds.width, 16)
+        )
 
-    def _create_triggers(self):
-        self.triggers = []
+    def update(self, delta_time):
+        super(FinalBoss, self).update(delta_time)
+
+    def draw(self, surface):
+        super(FinalBoss, self).draw(surface)
