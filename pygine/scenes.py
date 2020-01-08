@@ -11,8 +11,10 @@ from random import randint
 
 
 class SceneType(IntEnum):
-    TOPDOWN = 0
-    FLOCKING = 1
+    MENU = 0
+    BOSSA = 1
+    BOSSB = 2
+    FINALBOSS = 3
 
 
 class SceneManager:
@@ -40,7 +42,7 @@ class SceneManager:
         self.start_transition = False
 
         self.__initialize_scenes()
-        self.__set_starting_scene(SceneType.TOPDOWN)
+        self.__set_starting_scene(SceneType.MENU)
 
     def __add_scene(self, scene):
         self.__all_scenes.append(scene)
@@ -48,8 +50,10 @@ class SceneManager:
 
     def __initialize_scenes(self):
         self.__all_scenes = []
-        self.__add_scene(TopDown())
-        self.__add_scene(Flocking())
+        self.__add_scene(Menu())
+        self.__add_scene(BossA())
+        self.__add_scene(BossB())
+        self.__add_scene(FinalBoss())
 
     def __set_starting_scene(self, starting_scene_type):
         assert (len(self.__all_scenes) > 0), \
@@ -165,10 +169,11 @@ class Scene(object):
         self.scene_data = SceneDataRelay()
         self.scene_data.set_scene_bounds(self.scene_bounds)
 
-    def setup(self, entities_are_uniform, maximum_entity_dimension = 0):
+    def setup(self, entities_are_uniform, maximum_entity_dimension=0):
         self.entities_are_uniform = entities_are_uniform
         if self.entities_are_uniform:
-            self.optimal_bin_size = int(math.ceil(math.log(2, maximum_entity_dimension)))
+            self.optimal_bin_size = int(
+                math.ceil(math.log(2, maximum_entity_dimension)))
 
         self._reset()
         self._create_triggers()
@@ -274,65 +279,68 @@ class Scene(object):
             for t in self.triggers:
                 t.draw(surface, CameraType.DYNAMIC)
 
-        self.query_result = self.entity_quad_tree.query(self.camera_viewport.bounds)
+        self.query_result = self.entity_quad_tree.query(
+            self.camera_viewport.bounds)
         self.query_result.sort(key=lambda e: 1000 * (e.y + e.height) - e.x)
         for e in self.query_result:
             e.draw(surface)
 
-class TopDown(Scene):
+
+class Menu(Scene):
     def __init__(self):
-        super(TopDown, self).__init__()
-        self.setup(False)   
-        self.relay_actor(Player(self.scene_bounds.width / 2, self.scene_bounds.height / 2)) 
-
-    def _reset(self):
-        self.set_scene_bounds(
-            Rect(0, 0, Camera.BOUNDS.width * 2, Camera.BOUNDS.height))
-
-        self.entities = []
-        for y in range(int(math.ceil(self.scene_bounds.height / 8))):
-            for x in range(int(math.ceil(self.scene_bounds.width / 52))):
-                if randint(1, 10) <= 1:
-                    self.entities.append(Block(x * 52, y * 8))
-
-        self.sprites = []
-        for y in range(int(math.ceil(self.scene_bounds.height / 32))):
-            for x in range(int(math.ceil(self.scene_bounds.width / 32))):
-                if randint(1, 10) <= 3:
-                    self.sprites.append(Sprite(x * 32, y * 32 - 8, SpriteType.TILE))
-
-        self.shapes = []
-        self.shapes.append(
-            Rectangle(
-                0,
-                0,
-                self.scene_bounds.width,
-                self.scene_bounds.height,
-                Color.TEAL
-            )
-        )
-
-    def _create_triggers(self):
-        self.triggers = []
-
-
-class Flocking(Scene):
-    def __init__(self):
-        super(Flocking, self).__init__()
-        self.setup(True, 16)  
+        super(Menu, self).__init__()
 
     def _reset(self):
         self.set_scene_bounds(
             Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
         self.entities = []
-
-        for i in range(0, 100):
-            self.entities.append(
-                Boid(randint(8, self.scene_bounds.width), randint(8, self.scene_bounds.height)))
-
+        self.sprites = []
         self.shapes = []
-        self.shapes.append(Rectangle(
-            0, 0, self.scene_bounds.width, self.scene_bounds.height, Color.BLACK))
+
+    def _create_triggers(self):
+        self.triggers = []
+
+
+class BossA(Scene):
+    def __init__(self):
+        super(BossA, self).__init__()
+
+    def _reset(self):
+        self.set_scene_bounds(
+            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
+        self.entities = []
+        self.sprites = []
+        self.shapes = []
+
+    def _create_triggers(self):
+        self.triggers = []
+
+
+class BossB(Scene):
+    def __init__(self):
+        super(BossB, self).__init__()
+
+    def _reset(self):
+        self.set_scene_bounds(
+            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
+        self.entities = []
+        self.sprites = []
+        self.shapes = []
+
+    def _create_triggers(self):
+        self.triggers = []
+
+
+class FinalBoss(Scene):
+    def __init__(self):
+        super(FinalBoss, self).__init__()
+
+    def _reset(self):
+        self.set_scene_bounds(
+            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
+        self.entities = []
+        self.sprites = []
+        self.shapes = []
 
     def _create_triggers(self):
         self.triggers = []
