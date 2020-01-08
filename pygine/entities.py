@@ -53,11 +53,15 @@ class Kinetic(Entity):
     def __init__(self, x, y, width, height, speed):
         super(Kinetic, self).__init__(x, y, width, height)
         self.velocity = Vector2()
+        self.acceleration = Vector2()
         self.default_move_speed = speed
-        self.move_speed = 0
+        self.move_speed = speed
         self.facing = Direction.NONE
         self.collision_rectangles = []
         self.collision_width = 0
+
+        self.target = 1.0 / 60
+        self.accumulator = 0
 
     def _update_collision_rectangles(self):
         self.collision_width = 2
@@ -76,16 +80,31 @@ class Kinetic(Entity):
         self.move_speed = self.default_move_speed * delta_time
 
     def _apply_force(self, delta_time):
-        raise NotImplementedError(
-            "A class that inherits Kinetic did not implement the _apply_force(delta_time) method")
+        # Semi-Implict Euler Integrator
+        self.velocity = Vector2(
+            self.velocity.x + self.acceleration.x * delta_time,
+            self.velocity.y + self.acceleration.y * delta_time
+        )
+        self.set_location(
+            self.x + self.velocity.x * delta_time,
+            self.y + self.velocity.y * delta_time
+        )
+
+    def _simulate(self, elapsed_time, scene_data):
+        self.accumulator += elapsed_time
+
+        while(self.accumulator >= self.target):
+            self._apply_force(self.target)
+            self._collision(scene_data)
+
+            self.accumulator -= self.target
 
     def _collision(self, scene_data):
         raise NotImplementedError(
             "A class that inherits Kinetic did not implement the _collision(entities, entity_quad_tree) method")
 
     def update(self, delta_time, scene_data):
-        raise NotImplementedError(
-            "A class that inherits Kinetic did not implement the update(delta_time, scene_data) method")
+        self._simulate(delta_time, scene_data)
 
     def _draw_collision_rectangles(self, surface):
         for r in self.collision_rectangles:
@@ -108,35 +127,72 @@ class Actor(Kinetic):
 
 class Player(Actor):
     def __init__(self, x, y):
-        super(Player, self).__init__(x, y, 14, 8, 50)
-        self.sprite = Sprite(self.x - 9, self.y - 24, SpriteType.PLAYER)
+        super(Player, self).__init__(x, y, 16, 32, 90)
+        self.sprite = Sprite(self.x - 9, self.y - 16, SpriteType.PLAYER)
         self.query_result = None
+
+        self.jump_height = 16 * 5 + 4
+        self.jump_duration = 0.5
+
+        self.gravity = 2 * self.jump_height / \
+            (self.jump_duration * self.jump_duration)
+
+        self.initial_jump_velocity = self.gravity * self.jump_duration
+
+        self.lateral_acceleration = 175
+        self.friction = 150
+        self.drag = 50
+
+        self.velocity = Vector2(0, 0)
+        self.acceleration = Vector2(0, self.gravity)
+
+        self.grounded = False
+        self.jumping = False
+
+        self.sprite_flipped = False
 
     def set_location(self, x, y):
         super(Player, self).set_location(x, y)
-        self.sprite.set_location(self.x - 9, self.y - 24)
-
-    def _apply_force(self, delta_time):
-        self.set_location(self.x + self.velocity.x, self.y + self.velocity.y)
+        self.sprite.set_location(self.x - 9, self.y - 16)
 
     def _update_input(self):
-        if pressing(InputType.UP) and not pressing(InputType.DOWN):
-            self.velocity.y = -1 * self.move_speed
-
-        if pressing(InputType.DOWN) and not pressing(InputType.UP):
-            self.velocity.y = 1 * self.move_speed
-
-        if not pressing(InputType.UP) and not pressing(InputType.DOWN):
-            self.velocity.y = 0
-
         if pressing(InputType.LEFT) and not pressing(InputType.RIGHT):
-            self.velocity.x = -1 * self.move_speed
+            self.acceleration.x = -self.lateral_acceleration
+            if (self.velocity.x < -self.move_speed):
+                self.velocity.x = -self.move_speed
+
+            if (self.sprite_flipped):
+                self.sprite.flip_horizontally(True)
+                self.sprite_flipped = False
 
         if pressing(InputType.RIGHT) and not pressing(InputType.LEFT):
-            self.velocity.x = 1 * self.move_speed
+            self.acceleration.x = self.lateral_acceleration
+            if (self.velocity.x > self.move_speed):
+                self.velocity.x = self.move_speed
+
+            if (not self.sprite_flipped):
+                self.sprite.flip_horizontally(True)
+                self.sprite_flipped = True
 
         if not pressing(InputType.LEFT) and not pressing(InputType.RIGHT):
-            self.velocity.x = 0
+            if (self.velocity.x != 0):
+                dir = -1 if self.velocity.x > 0 else 1
+                if (self.grounded):
+                    self.acceleration.x = self.friction * dir
+                else:
+                    self.acceleration.x = self.drag * dir
+
+            if (-1 < self.velocity.x and self.velocity.x < 1):
+                self.velocity.x = 0
+                self.acceleration.x = 0
+
+        if (self.grounded and not self.jumping and pressing(InputType.A)):
+            self.velocity.y = -self.initial_jump_velocity
+            self.jumping = True
+
+        if (self.jumping and self.velocity.y < -self.initial_jump_velocity / 2 and not pressing(InputType.A)):
+            self.velocity.y = -self.initial_jump_velocity / 2
+            self.jumping = False
 
     def __rectanlge_collision_logic(self, entity):
         # Bottom
@@ -145,6 +201,11 @@ class Player(Actor):
         # Top
         if self.collision_rectangles[1].colliderect(entity.bounds) and self.velocity.y > 0:
             self.set_location(self.x, entity.bounds.top - self.bounds.height)
+
+            self.velocity.y = 0
+            self.grounded = True
+            self.jumping = False
+
         # Right
         if self.collision_rectangles[2].colliderect(entity.bounds) and self.velocity.x < 0:
             self.set_location(entity.bounds.right, self.y)
@@ -153,18 +214,32 @@ class Player(Actor):
             self.set_location(entity.bounds.left - self.bounds.width, self.y)
 
     def _collision(self, scene_data):
+        self._update_collision_rectangles()
+
         if (globals.debugging):
             for e in scene_data.entities:
                 e.set_color(Color.WHITE)
 
         self.area = Rect(
-           self.x - 52,
-           self.y - 16,
-           self.width + 52 * 2,
-           self.height + 16 * 2
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
         )
 
         self.query_result = scene_data.entity_quad_tree.query(self.area)
+
+        self.grounded = False
+
+        if (self.x < 0):
+            self.set_location(0, self.y)
+            self.velocity.x = -self.velocity.x * 0.75
+
+        if (self.x + self.width > scene_data.scene_bounds.width):
+            self.set_location(
+                scene_data.scene_bounds.width - self.width, self.y)
+            self.velocity.x = -self.velocity.x * 0.75
+
         for e in self.query_result:
             if e is self:
                 continue
@@ -177,11 +252,9 @@ class Player(Actor):
                 self._update_collision_rectangles()
 
     def update(self, delta_time, scene_data):
-        self._calculate_scaled_speed(delta_time)
         self._update_input()
-        self._apply_force(delta_time)
-        self._update_collision_rectangles()
-        self._collision(scene_data)
+
+        super(Player, self).update(delta_time, scene_data)
 
     def draw(self, surface):
         if globals.debugging:
@@ -204,9 +277,8 @@ class Player(Actor):
 
 
 class Block(Entity):
-    def __init__(self, x, y):
-        super(Block, self).__init__(x, y, 52, 16)
-        self.sprite = Sprite(self.x - 6, self.y - 13, SpriteType.BLOCK)
+    def __init__(self, x, y, width, height):
+        super(Block, self).__init__(x, y, width, height)
 
     def update(self, delta_time, scene_data):
         pass
@@ -214,171 +286,6 @@ class Block(Entity):
     def draw(self, surface):
         if globals.debugging:
             draw_rectangle(surface, self.bounds,
-                           CameraType.DYNAMIC, self.color)
+                           CameraType.DYNAMIC, self.color, 4)
         else:
-            self.sprite.draw(surface, CameraType.DYNAMIC)
-
-
-class Boid(Kinetic):
-    def __init__(self, x, y):
-        super(Boid, self).__init__(x, y, 8, 8, 50)
-        self.circle = Circle(self.x, self.y, self.width / 2, Color.WHITE, 1)
-
-        self.steer = Vector2(0, 0)
-        self.acceleration = Vector2(0, 0)
-        self.velocity = Vector2(
-            -self.default_move_speed +
-            randint(0, 5) * self.default_move_speed * 2 / 5,
-            -self.default_move_speed +
-            randint(0, 5) * self.default_move_speed * 2 / 5,
-        )
-
-        self.max_force = 0.5
-        self.view_radius = 16
-
-        self.query_result = None
-
-    def set_location(self, x, y):
-        super(Boid, self).set_location(x, y)
-        self.circle.set_location(
-            self.x - self.width / 2, self.y - self.width / 2)
-
-    def _apply_force(self, delta_time):
-        self.velocity = Vector2(
-            self.velocity.x + self.steer.x,
-            self.velocity.y + self.steer.y
-        )
-
-        self.set_location(self.x + self.velocity.x * delta_time,
-                          self.y + self.velocity.y * delta_time)
-
-    def _collision(self, scene_data):
-        if self.x < -self.width:
-            self.set_location(scene_data.scene_bounds.width + self.width, self.y)
-        if self.x > scene_data.scene_bounds.width + self.width:
-            self.set_location(-self.width, self.y)
-        if self.y < -self.height:
-            self.set_location(self.x, scene_data.scene_bounds.height + self.height)
-        if self.y > scene_data.scene_bounds.height + self.height:
-            self.set_location(self.x, -self.height)
-
-    def __separation(self):
-        steer = Vector2(0, 0)
-        cumulative = Vector2(0, 0)
-        force = Vector2(0, 0)
-        distance = 0
-        total = 0
-
-        for e in self.query_result:
-            if e is self:
-                continue
-
-            distance = Vector2.distance_between(e.location, self.location)
-            if distance > 0 and distance < self.width:
-                force = Vector2(
-                    self.location.x - e.location.x,
-                    self.location.y - e.location.y
-                )
-                force.divide(distance**2)
-                cumulative.add(force)
-                total += 1
-
-        if total > 0:
-            cumulative.divide(total)
-            cumulative.set_magnitude(self.default_move_speed)
-
-            steer = Vector2(
-                cumulative.x - self.velocity.x,
-                cumulative.y - self.velocity.y
-            )
-            steer.limit(self.max_force)
-
-        return steer
-
-    def __alignment(self):
-        steer = Vector2(0, 0)
-        cumulative = Vector2(0, 0)
-        distance = 0
-        total = 0
-
-        for e in self.query_result:
-            if e is self:
-                continue
-
-            if isinstance(e, Boid):
-                distance = Vector2.distance_between(e.location, self.location)
-                if distance > 0 and distance < self.view_radius:
-                    cumulative.add(e.velocity)
-                    total += 1
-
-        if total > 0:
-            cumulative.divide(total)
-            cumulative.set_magnitude(self.default_move_speed)
-
-            steer = Vector2(
-                cumulative.x - self.velocity.x,
-                cumulative.y - self.velocity.y
-            )
-            steer.limit(self.max_force)
-
-        return steer
-
-    def __cohesion(self):
-        steer = Vector2(0, 0)
-        cumulative = Vector2(0, 0)
-        distance = 0
-        total = 0
-
-        for e in self.query_result:
-            if e is self:
-                continue
-
-            distance = Vector2.distance_between(e.location, self.location)
-            if distance > 0 and distance < self.view_radius:
-                cumulative.add(e.location)
-                total += 1
-
-        if total > 0:
-            cumulative.divide(total)
-            cumulative.subtract(self.location)
-            cumulative.set_magnitude(self.default_move_speed)
-
-            steer = Vector2(
-                cumulative.x - self.velocity.x,
-                cumulative.y - self.velocity.y
-            )
-            steer.limit(self.max_force)
-
-        return steer
-
-    def __update_flocking_behavior(self, scene_data):
-        self.query_result = scene_data.entity_bin.query(
-            Rect(
-                self.x - self.view_radius,
-                self.y - self.view_radius,
-                self.view_radius * 2,
-                self.view_radius * 2
-            )
-        )
-
-        seperation = self.__separation()
-        alignment = self.__alignment()
-        cohesion = self.__cohesion()
-
-        seperation.multiply(3)
-        alignment.multiply(1)
-        cohesion.multiply(0.5)
-
-        self.steer = Vector2(
-            seperation.x + alignment.x + cohesion.x,
-            seperation.y + alignment.y + cohesion.y
-        )
-
-    def update(self, delta_time, scene_data):
-        self._calculate_scaled_speed(delta_time)
-        self.__update_flocking_behavior(scene_data)
-        self._apply_force(delta_time)
-        self._collision(scene_data)
-
-    def draw(self, surface):
-        self.circle.draw(surface)
+            pass

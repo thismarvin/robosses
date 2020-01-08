@@ -30,9 +30,8 @@ def load_content():
 class SpriteType(IntEnum):
     NONE = 0
     TEXT = 1
-    PLAYER = 2
-    BLOCK = 3
-    TILE = 4
+    TITLE = 2
+    PLAYER = 3
 
 
 class Sprite(PygineObject):
@@ -58,6 +57,22 @@ class Sprite(PygineObject):
         self.__sprite_y += increment
         self.__apply_changes_to_sprite()
 
+    def flip_horizontally(self, flip):
+        if flip:
+            self.image = pygame.transform.flip(
+                self.image, True, False).convert_alpha()
+        else:
+            self.image = pygame.transform.flip(
+                self.image, False, False).convert_alpha()
+
+    def flip_vertically(self, flip):
+        if flip:
+            self.image = pygame.transform.flip(
+                self.image, False, True).convert_alpha()
+        else:
+            self.image = pygame.transform.flip(
+                self.image, False, False).convert_alpha()
+
     def __sprite_setup(self, sprite_x=0, sprite_y=0, width=0, height=0):
         self.__original_sprite_x = sprite_x
         self.__original_sprite_y = sprite_y
@@ -68,22 +83,21 @@ class Sprite(PygineObject):
 
     def __load_sprite(self):
         if self.type == SpriteType.NONE:
-            self.__sprite_setup(1023, 1023, 1, 1)
+            self.__sprite_setup(0, 0, 16, 16)
 
         elif (self.type == SpriteType.TEXT):
             self.__sprite_setup(0, 0, 8, 8)
 
+        elif (self.type == SpriteType.TITLE):
+            self.__sprite_setup(0, 0, 128, 32)
         elif (self.type == SpriteType.PLAYER):
-            self.__sprite_setup(0, 0, 32, 32)
-        elif (self.type == SpriteType.BLOCK):
-            self.__sprite_setup(0, 32, 64, 32)
-        elif (self.type == SpriteType.TILE):
-            self.__sprite_setup(32, 0, 32, 32)
+            self.__sprite_setup(0, 32, 32, 48)
 
         self.__apply_changes_to_sprite()
 
     def __apply_changes_to_sprite(self):
-        self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        self.image = pygame.Surface(
+            (self.width, self.height), pygame.SRCALPHA).convert_alpha()
 
         if self.type == SpriteType.TEXT:
             self.image.blit(TEXT_SHEET, (0, 0),

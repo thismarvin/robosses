@@ -6,6 +6,7 @@ from pygine.input import InputType, pressed
 from pygine.maths import Vector2
 from pygine.structures import Quadtree, Bin
 from pygine.transitions import Pinhole, TransitionType
+from pygine.triggers import OnButtonPressTrigger
 from pygine.utilities import Camera
 from random import randint
 
@@ -115,14 +116,18 @@ class SceneDataRelay(object):
         self.entities = None
         self.entity_quad_tree = None
         self.entity_bin = None
+        self.kinetic_quad_tree = None
+        self.actor = None
 
     def set_scene_bounds(self, bounds):
         self.scene_bounds = bounds
 
-    def update(self, entites, entity_quad_tree, entity_bin):
+    def update(self, entites, entity_quad_tree, entity_bin, kinetic_quad_tree, actor):
         self.entities = entites
         self.entity_quad_tree = entity_quad_tree
         self.entity_bin = entity_bin
+        self.kinetic_quad_tree = kinetic_quad_tree
+        self.actor = actor
 
 
 class Scene(object):
@@ -155,6 +160,7 @@ class Scene(object):
         self.sprite_quad_tree = Quadtree(self.scene_bounds, 4)
         self.shape_quad_tree = Quadtree(self.scene_bounds, 4)
         self.entity_quad_tree = Quadtree(self.scene_bounds, 4)
+        self.kinetic_quad_tree = Quadtree(self.scene_bounds, 4)
         self.entity_bin = Bin(self.scene_bounds, 4)
         self.query_result = None
         self.first_pass = True
@@ -173,7 +179,7 @@ class Scene(object):
         self.entities_are_uniform = entities_are_uniform
         if self.entities_are_uniform:
             self.optimal_bin_size = int(
-                math.ceil(math.log(2, maximum_entity_dimension)))
+                math.ceil(math.log(maximum_entity_dimension, 2)))
 
         self._reset()
         self._create_triggers()
@@ -182,7 +188,7 @@ class Scene(object):
         self.scene_bounds = bounds
         self.scene_data.set_scene_bounds(self.scene_bounds)
 
-        buffer = 8
+        buffer = 0
         modified_bounds = Rect(
             -buffer,
             -buffer,
@@ -193,7 +199,9 @@ class Scene(object):
         self.sprite_quad_tree = Quadtree(modified_bounds, 4)
         self.shape_quad_tree = Quadtree(modified_bounds, 4)
         self.entity_quad_tree = Quadtree(modified_bounds, 4)
-        self.entity_bin = Bin(modified_bounds, 5)
+        self.kinetic_quad_tree = Quadtree(self.scene_bounds, 4)
+        if self.entities_are_uniform:
+            self.entity_bin = Bin(modified_bounds, self.optimal_bin_size)
         self.first_pass = True
 
     def relay_actor(self, actor):
@@ -224,22 +232,29 @@ class Scene(object):
                 self.shape_quad_tree.insert(self.shapes[i])
             self.first_pass = False
 
-        self.entity_quad_tree.clear()
-        if self.entities_are_uniform:
-            self.entity_bin.clear()
-        for i in range(len(self.entities)):
-            self.entity_quad_tree.insert(self.entities[i])
+            self.entity_quad_tree.clear()
             if self.entities_are_uniform:
-                self.entity_bin.insert(self.entities[i])
+                self.entity_bin.clear()
+            for i in range(len(self.entities)):
+                if not isinstance(self.entities[i], Kinetic):
+                    self.entity_quad_tree.insert(self.entities[i])
+                    if self.entities_are_uniform:
+                        self.entity_bin.insert(self.entities[i])
+
+        self.kinetic_quad_tree.clear()
+        for i in range(len(self.entities)):
+            if isinstance(self.entities[i], Kinetic):
+                self.kinetic_quad_tree.insert(self.entities[i])
 
     def __update_entities(self, delta_time):
         for i in range(len(self.entities)-1, -1, -1):
             self.entities[i].update(delta_time, self.scene_data)
-        #self.entities.sort(key=lambda e: 1000 * (e.y + e.height) - e.x)
+            if self.entities[i].remove:
+                del self.entities[i]
 
     def __update_triggers(self, delta_time):
         for t in self.triggers:
-            t.update(delta_time, self.entities, self.manager)
+            t.update(delta_time, self.scene_data, self.manager)
 
     def __update_camera(self):
         if self.actor != None:
@@ -258,7 +273,9 @@ class Scene(object):
         self.scene_data.update(
             self.entities,
             self.entity_quad_tree,
-            self.entity_bin
+            self.entity_bin,
+            self.kinetic_quad_tree,
+            self.actor
         )
         self.__update_entities(delta_time)
         self.__update_triggers(delta_time)
@@ -275,40 +292,71 @@ class Scene(object):
         for s in self.query_result:
             s.draw(surface, CameraType.DYNAMIC)
 
-        if globals.debugging:
-            for t in self.triggers:
-                t.draw(surface, CameraType.DYNAMIC)
-
         self.query_result = self.entity_quad_tree.query(
             self.camera_viewport.bounds)
-        self.query_result.sort(key=lambda e: 1000 * (e.y + e.height) - e.x)
+
         for e in self.query_result:
             e.draw(surface)
+
+        self.query_result = self.kinetic_quad_tree.query(
+            self.camera_viewport.bounds)
+
+        for e in self.query_result:
+            if not isinstance(e, Actor):
+                e.draw(surface)
+
+        if self.actor != None:
+            self.actor.draw(surface)
+
+        if globals.debugging:
+            self.entity_quad_tree.draw(surface)
+            for t in self.triggers:
+                t.draw(surface, CameraType.DYNAMIC)
 
 
 class Menu(Scene):
     def __init__(self):
         super(Menu, self).__init__()
+        self.setup(False)
+        self.relay_actor(Player(16, 16))
 
     def _reset(self):
         self.set_scene_bounds(
             Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
+
         self.entities = []
-        self.sprites = []
+
+        self.sprites = [
+            Sprite((self.scene_bounds.width - 128) / 2,
+                   (self.scene_bounds.height - 32) / 2, SpriteType.TITLE)
+        ]
+
         self.shapes = []
 
     def _create_triggers(self):
-        self.triggers = []
+        self.triggers = [
+            OnButtonPressTrigger(
+                InputType.A,
+                Vector2(
+                    self.scene_bounds.width / 2,
+                    -128
+                ),
+                SceneType.BOSSA
+            )
+        ]
 
 
 class BossA(Scene):
     def __init__(self):
         super(BossA, self).__init__()
+        self.setup(False)
 
     def _reset(self):
         self.set_scene_bounds(
             Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
-        self.entities = []
+        self.entities = [
+            Block(0,self.scene_bounds.height - 16, self.scene_bounds.width, 16)
+        ]
         self.sprites = []
         self.shapes = []
 
@@ -319,6 +367,7 @@ class BossA(Scene):
 class BossB(Scene):
     def __init__(self):
         super(BossB, self).__init__()
+        self.setup(False)
 
     def _reset(self):
         self.set_scene_bounds(
@@ -334,6 +383,7 @@ class BossB(Scene):
 class FinalBoss(Scene):
     def __init__(self):
         super(FinalBoss, self).__init__()
+        self.setup(False)
 
     def _reset(self):
         self.set_scene_bounds(
