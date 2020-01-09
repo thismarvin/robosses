@@ -387,15 +387,17 @@ class Select(Scene):
         super(Select, self).draw(surface)
 
 
-class Boss(Scene):
+class BossBattle(Scene):
     def __init__(self):
-        super(Boss, self).__init__()
+        super(BossBattle, self).__init__()
         self.setup(False)
+
+        self.background = Sprite(0, 0, SpriteType.BACKGROUND_0)
 
         self.arena_setup = False
         self.player_released = False
         self.release_timer = Timer(1000)
-        
+
     def _reset(self):
         self.set_scene_bounds(
             Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
@@ -408,7 +410,7 @@ class Boss(Scene):
 
     def _create_arena(self):
         raise NotImplementedError(
-            "A class that inherits Boss did not implement the _create_arena() method")
+            "A class that inherits BossBattle did not implement the _create_arena() method")
 
     def update(self, delta_time):
         if (not self.arena_setup):
@@ -421,22 +423,26 @@ class Boss(Scene):
             self.actor.enter_arena()
             self.player_released = True
 
-        super(Boss, self).update(delta_time)
+        super(BossBattle, self).update(delta_time)
 
     def draw(self, surface):
-        super(Boss, self).draw(surface)
+        self.background.draw(surface, CameraType.STATIC)
+        super(BossBattle, self).draw(surface)
 
 
-class BossA(Boss):
+class BossA(BossBattle):
     def __init__(self):
         super(BossA, self).__init__()
+        self.background.set_sprite(SpriteType.BACKGROUND_0)
         self.release_timer = Timer(500)
 
     def _create_arena(self):
         self.entities.append(
             Block(0, self.scene_bounds.height -
-                  16, self.scene_bounds.width, 16)
+                  32, self.scene_bounds.width, 32)
         )
+
+        self.entities.append(Octopus())
 
         self.actor.set_location(
             (self.scene_bounds.width - self.actor.width / 2) / 2,
@@ -450,14 +456,15 @@ class BossA(Boss):
         super(BossA, self).draw(surface)
 
 
-class BossB(Boss):
+class BossB(BossBattle):
     def __init__(self):
         super(BossB, self).__init__()
+        self.background.set_sprite(SpriteType.BACKGROUND_1)
 
     def _create_arena(self):
         self.entities.append(
             Block(0, self.scene_bounds.height -
-                  16, self.scene_bounds.width, 16)
+                  32, self.scene_bounds.width, 32)
         )
 
     def update(self, delta_time):
@@ -467,14 +474,15 @@ class BossB(Boss):
         super(BossB, self).draw(surface)
 
 
-class FinalBoss(Boss):
+class FinalBoss(BossBattle):
     def __init__(self):
         super(FinalBoss, self).__init__()
+        self.background.set_sprite(SpriteType.BACKGROUND_2)
 
     def _create_arena(self):
         self.entities.append(
             Block(0, self.scene_bounds.height -
-                  16, self.scene_bounds.width, 16)
+                  32, self.scene_bounds.width, 32)
         )
 
     def update(self, delta_time):
