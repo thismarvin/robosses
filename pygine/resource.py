@@ -66,6 +66,11 @@ class SpriteType(IntEnum):
 
     OCTOPUS = 9
 
+    GOLEM_FIST = 10
+    GOLEM_PALM = 11
+    GOLEM_BODY = 12
+    GOLEM_CORE = 13
+
 
 class Sprite(PygineObject):
     def __init__(self, x, y, sprite_type=SpriteType.NONE):
@@ -147,6 +152,19 @@ class Sprite(PygineObject):
         elif (self.type == SpriteType.OCTOPUS):
             self.__sprite_setup(0, 0, 160, 176)
             self.sprite_sheet = BOSS_SPRITES[0]
+
+        elif (self.type == SpriteType.GOLEM_FIST):
+            self.__sprite_setup(80, 0, 80, 64)
+            self.sprite_sheet = BOSS_SPRITES[1]
+        elif (self.type == SpriteType.GOLEM_PALM):
+            self.__sprite_setup(80, 64, 80, 112)
+            self.sprite_sheet = BOSS_SPRITES[1]
+        elif (self.type == SpriteType.GOLEM_BODY):
+            self.__sprite_setup(0, 0, 80, 192)
+            self.sprite_sheet = BOSS_SPRITES[1]
+        elif (self.type == SpriteType.GOLEM_CORE):
+            self.__sprite_setup(0, 0, 16, 16)
+            self.sprite_sheet = BOSS_SPRITES[1]
 
         self.__apply_changes_to_sprite()
 
