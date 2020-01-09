@@ -8,7 +8,7 @@ from pygine import globals
 from pygine.input import InputType, pressed, pressing
 from pygine.maths import Vector2
 from pygine.resource import Sprite, SpriteType
-from pygine.utilities import CameraType, Color
+from pygine.utilities import CameraType, Color, Timer
 from random import randint
 
 
@@ -336,6 +336,9 @@ class Boss(Entity):
     def __init__(self, x, y, width, height):
         super(Boss, self).__init__(x, y, width, height)
 
+    def hit(self):
+        pass
+
     def update(self, delta_time, scene_data):
         pass
 
@@ -356,3 +359,114 @@ class Octopus(Boss):
     def draw(self, surface):
         self.sprite_left.draw(surface, CameraType.STATIC)
         self.sprite_right.draw(surface, CameraType.STATIC)
+
+class GolemHands(Kinetic):
+    def __init__(self):
+        super(GolemHands, self).__init__(0, 0, 16, 16, 10)
+        self.sprite_left = Sprite(0, 64, SpriteType.GOLEM_FIST)
+        self.sprite_right = Sprite(320 - 96, 64, SpriteType.GOLEM_FIST)
+        self.sprite_right.flip_horizontally(True)
+
+        self.is_attacking = False
+        self.__attack_time = 2500
+        self.__seek_speed = 5
+        self.__attack_speed = 2
+        self.attack_timer = Timer(self.__attack_time, True)
+
+        self.velocity = Vector2(0, 0)
+        self.acceleration = Vector2(0, 0)
+
+        # Kinetic needs this
+        self.query_result = None        
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
+    def set_location(self, x, y):
+        super(GolemHands, self).set_location(x, y)
+        self.sprite_left.set_location(self.x, self.y)
+
+
+    def attack(self):
+        self.velocity.y += self.__attack_speed
+        if (not self.is_attacking):
+            pass
+
+    def seek(self, delta_time, scene_data):
+        if (scene_data.actor.x + scene_data.actor.width / 2 < self.x - self.width / 2):
+            self.velocity = Vector2(self.__seek_speed, 0)
+        elif (scene_data.actor.x + scene_data.actor.width / 2 > self.x - self.width / 2):
+            self.velocity = Vector2(-self.__seek_speed, 0)
+
+
+    def __rectanlge_collision_logic(self, entity):
+        # Bottom
+        if self.collision_rectangles[0].colliderect(entity.bounds) and self.velocity.y < 0:
+            self.set_location(self.x, entity.bounds.bottom)
+        # Top
+        if self.collision_rectangles[1].colliderect(entity.bounds) and self.velocity.y > 0:
+            self.set_location(self.x, entity.bounds.top - self.bounds.height)
+        # Right
+        if self.collision_rectangles[2].colliderect(entity.bounds) and self.velocity.x < 0:
+            self.set_location(entity.bounds.right, self.y)
+        # Left
+        if self.collision_rectangles[3].colliderect(entity.bounds) and self.velocity.x > 0:
+            self.set_location(entity.bounds.left - self.bounds.width, self.y)
+
+    def _collision(self, scene_data):
+        self._update_collision_rectangles()
+
+        if (globals.debugging):
+            for e in scene_data.entities:
+                e.set_color(Color.WHITE)
+
+        self.area = Rect(
+            self.x - 16,
+            self.y - 16,
+            self.width + 16 * 2,
+            self.height + 16 * 2
+        )
+
+        self.query_result = scene_data.entity_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if (globals.debugging):
+                e.set_color(Color.RED)
+
+
+    def update(self, delta_time, scene_data):
+        self.attack_timer.update(delta_time)
+        if (not self.attack_timer.done):
+            self.seek(delta_time, scene_data)
+        #else
+        
+        super(GolemHands, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        self.sprite_left.draw(surface, CameraType.STATIC)
+        self.sprite_right.draw(surface, CameraType.STATIC)
+
+
+class Golem(Boss):
+    def __init__(self):
+        super(Golem, self).__init__(0, 0, 16, 16)
+        self.sprite_body_left = Sprite(80, 16, SpriteType.GOLEM_BODY)
+        self.sprite_body_right = Sprite(80 + 5 * 16, 16, SpriteType.GOLEM_BODY)
+        self.sprite_body_right.flip_horizontally(True)
+
+        self.hands = GolemHands()
+        
+    def update(self, delta_time, scene_data):
+        self.hands.update(delta_time, scene_data)
+
+    def draw(self, surface):
+        self.sprite_body_left.draw(surface, CameraType.STATIC)
+        self.sprite_body_right.draw(surface, CameraType.STATIC)
+
+        self.hands.draw(surface)
