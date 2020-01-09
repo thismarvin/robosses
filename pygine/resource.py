@@ -11,6 +11,9 @@ from pygine.utilities import Timer
 SPRITE_SHEET = None
 TEXT_SHEET = None
 
+BOSS_BACKGROUNDS = []
+BOSS_SPRITES = []
+
 
 def load_content():
     global SPRITE_SHEET
@@ -24,7 +27,29 @@ def load_content():
     TEXT_SHEET = pygame.image.load(
         path + "/assets/sprites/font.png"
     )
+    __load_layers()
+
     load_sound_paths()
+
+
+def __load_layers():
+    # Load Extra backgrounds
+    path = os.path.dirname(os.path.abspath(__file__)) + \
+        "/assets/sprites/bosses/"
+
+    BOSS_BACKGROUNDS.append(pygame.image.load(
+        path + "boss_0_background.png").convert())
+    BOSS_BACKGROUNDS.append(pygame.image.load(
+        path + "boss_1_background.png").convert())
+    BOSS_BACKGROUNDS.append(pygame.image.load(
+        path + "boss_2_background.png").convert())
+
+    BOSS_SPRITES.append(pygame.image.load(
+        path + "boss_0_sprites.png").convert_alpha())
+    BOSS_SPRITES.append(pygame.image.load(
+        path + "boss_1_sprites.png").convert_alpha())
+    BOSS_SPRITES.append(pygame.image.load(
+        path + "boss_2_sprites.png").convert_alpha())
 
 
 class SpriteType(IntEnum):
@@ -35,10 +60,18 @@ class SpriteType(IntEnum):
     PLAYERA = 4
     PLAYERB = 5
 
+    BACKGROUND_0 = 6
+    BACKGROUND_1 = 7
+    BACKGROUND_2 = 8
+
+    OCTOPUS = 9
+
 
 class Sprite(PygineObject):
     def __init__(self, x, y, sprite_type=SpriteType.NONE):
         super(Sprite, self).__init__(x, y, 0, 0)
+
+        self.sprite_sheet = SPRITE_SHEET
         self.set_sprite(sprite_type)
 
     def set_sprite(self, sprite_type):
@@ -89,16 +122,31 @@ class Sprite(PygineObject):
 
         elif (self.type == SpriteType.TEXT):
             self.__sprite_setup(0, 0, 8, 8)
+            self.sprite_sheet = TEXT_SHEET
 
         elif (self.type == SpriteType.TITLE):
             self.__sprite_setup(0, 0, 144, 32)
         elif (self.type == SpriteType.SELECT):
             self.__sprite_setup(0, 96, 208, 32)
-            
+
         elif (self.type == SpriteType.PLAYERA):
             self.__sprite_setup(0, 32, 32, 48)
         elif (self.type == SpriteType.PLAYERB):
             self.__sprite_setup(32, 32, 32, 48)
+
+        elif (self.type == SpriteType.BACKGROUND_0):
+            self.__sprite_setup(0, 0, 320, 240)
+            self.sprite_sheet = BOSS_BACKGROUNDS[0]
+        elif (self.type == SpriteType.BACKGROUND_1):
+            self.__sprite_setup(0, 0, 320, 240)
+            self.sprite_sheet = BOSS_BACKGROUNDS[1]
+        elif (self.type == SpriteType.BACKGROUND_2):
+            self.__sprite_setup(0, 0, 320, 240)
+            self.sprite_sheet = BOSS_BACKGROUNDS[2]
+
+        elif (self.type == SpriteType.OCTOPUS):
+            self.__sprite_setup(0, 0, 160, 176)
+            self.sprite_sheet = BOSS_SPRITES[0]
 
         self.__apply_changes_to_sprite()
 
@@ -106,12 +154,8 @@ class Sprite(PygineObject):
         self.image = pygame.Surface(
             (self.width, self.height), pygame.SRCALPHA).convert_alpha()
 
-        if self.type == SpriteType.TEXT:
-            self.image.blit(TEXT_SHEET, (0, 0),
-                            (self.__sprite_x, self.__sprite_y, self.width, self.height))
-        else:
-            self.image.blit(SPRITE_SHEET, (0, 0),
-                            (self.__sprite_x, self.__sprite_y, self.width, self.height))
+        self.image.blit(self.sprite_sheet, (0, 0),
+                        (self.__sprite_x, self.__sprite_y, self.width, self.height))
 
     def draw(self, surface, camera_type):
         draw_image(surface, self.image, self.bounds, camera_type)
