@@ -64,7 +64,7 @@ class Kinetic(Entity):
         self.accumulator = 0
 
     def _update_collision_rectangles(self):
-        self.collision_width = 2
+        self.collision_width = 4
         self.collision_rectangles = [
             Rect(self.x + self.collision_width, self.y - self.collision_width,
                  self.width - self.collision_width * 2, self.collision_width),
@@ -153,6 +153,13 @@ class Player(Actor):
 
         self.entered_arena = False
 
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
     def reset(self):
         self.velocity = Vector2(0, 0)
         self.acceleration = Vector2(0, self.gravity)
@@ -230,10 +237,10 @@ class Player(Actor):
                 e.set_color(Color.WHITE)
 
         self.area = Rect(
-            self.x - 8,
-            self.y - 8,
-            self.width + 8 * 2,
-            self.height + 8 * 2
+            self.x - 16,
+            self.y - 16,
+            self.width + 16 * 2,
+            self.height + 16 * 2
         )
 
         self.query_result = scene_data.entity_quad_tree.query(self.area)
@@ -323,3 +330,29 @@ class Block(Entity):
                            CameraType.DYNAMIC, self.color, 4)
         else:
             pass
+
+
+class Boss(Entity):
+    def __init__(self, x, y, width, height):
+        super(Boss, self).__init__(x, y, width, height)
+
+    def update(self, delta_time, scene_data):
+        pass
+
+    def draw(self, surface):
+        pass
+
+
+class Octopus(Boss):
+    def __init__(self):
+        super(Octopus, self).__init__(0, 0, 16, 16)
+        self.sprite_left = Sprite(0, 0, SpriteType.OCTOPUS)
+        self.sprite_right = Sprite(160, 0, SpriteType.OCTOPUS)
+        self.sprite_right.flip_horizontally(True)
+
+    def update(self, delta_time, scene_data):
+        pass
+
+    def draw(self, surface):
+        self.sprite_left.draw(surface, CameraType.STATIC)
+        self.sprite_right.draw(surface, CameraType.STATIC)
