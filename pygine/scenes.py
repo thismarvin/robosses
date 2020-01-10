@@ -121,6 +121,8 @@ class SceneDataRelay(object):
         self.kinetic_quad_tree = None
         self.actor = None
 
+        self.entity_buffer = []
+
     def set_scene_bounds(self, bounds):
         self.scene_bounds = bounds
 
@@ -253,6 +255,11 @@ class Scene(object):
             self.entities[i].update(delta_time, self.scene_data)
             if self.entities[i].remove:
                 del self.entities[i]
+
+        if (len(self.scene_data.entity_buffer) > 0):
+            for i in range(len(self.scene_data.entity_buffer)-1, -1, -1):
+                self.entities.append(self.scene_data.entity_buffer[i])
+            self.scene_data.entity_buffer = []
 
     def __update_triggers(self, delta_time):
         for t in self.triggers:
