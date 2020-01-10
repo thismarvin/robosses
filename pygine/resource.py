@@ -71,10 +71,12 @@ class SpriteType(IntEnum):
     GOLEM_BODY = 12
     GOLEM_CORE = 13
 
-
     GUN_0_H = 24
     GUN_0_V = 25
     BULLET = 26
+
+    OCTOPUS_ARM = 27
+    OCTOPUS_GUN = 28
 
 
 class Sprite(PygineObject):
@@ -156,6 +158,13 @@ class Sprite(PygineObject):
 
         elif (self.type == SpriteType.OCTOPUS):
             self.__sprite_setup(0, 0, 160, 176)
+            self.sprite_sheet = BOSS_SPRITES[0]
+
+        elif (self.type == SpriteType.OCTOPUS_ARM):
+            self.__sprite_setup(0, 192, 144, 64)
+            self.sprite_sheet = BOSS_SPRITES[0]
+        elif (self.type == SpriteType.OCTOPUS_GUN):
+            self.__sprite_setup(160, 176, 96, 80)
             self.sprite_sheet = BOSS_SPRITES[0]
 
         elif (self.type == SpriteType.GOLEM_FIST):
