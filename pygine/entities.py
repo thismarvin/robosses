@@ -138,44 +138,59 @@ class Gun(Entity):
         self.timer_frequency = Timer(250)
         self.can_shoot = True
 
-        self.gun_sprite_is_flipped = False
-
     def face(self, direction):
         self.facing = direction
 
-        if (self.facing == Direction.RIGHT and not self.gun_sprite_is_flipped):
-            self.sprite.flip_horizontally(True)
-            self.gun_sprite_is_flipped = True
+        if (self.facing == Direction.UP):
+            self.sprite.set_sprite(SpriteType.GUN_0_V)
+        else:
+            self.sprite.set_sprite(SpriteType.GUN_0_H)
 
-        if (self.facing == Direction.LEFT and self.gun_sprite_is_flipped):
+        if (self.facing == Direction.RIGHT):
             self.sprite.flip_horizontally(True)
-            self.gun_sprite_is_flipped = False
+        elif (self.facing == Direction.LEFT):
+            self.sprite.flip_horizontally(False)
 
     def fire(self, x, y, extra_velocity, scene_data):
         if (not self.can_shoot):
             return
 
-        # Eh
         extra = 0
         direction = 0
-        if (self.facing == Direction.LEFT):
+
+        if (self.facing == Direction.LEFT or self.facing == Direction.RIGHT):
+            if (self.facing == Direction.LEFT):
+                direction = -1
+                if (extra_velocity < 0):
+                    extra = extra_velocity
+            else:
+                direction = 1
+                if (extra_velocity > 0):
+                    extra = extra_velocity
+
+            # Create Bullet
+            scene_data.entity_buffer.append(
+                Bullet(
+                    x, y,
+                    Vector2(direction * self.bullet_speed + extra, 0),
+                    self.bullet_travel,
+                    self.bullet_damage
+                )
+            )
+        else:
             direction = -1
             if (extra_velocity < 0):
                 extra = extra_velocity
-        else:
-            direction = 1
-            if (extra_velocity > 0):
-                extra = extra_velocity
 
-        # Create Bullet
-        scene_data.entity_buffer.append(
-            Bullet(
-                x, y,
-                Vector2(direction * self.bullet_speed + extra, 0),
-                self.bullet_travel,
-                self.bullet_damage
+            # Create Bullet
+            scene_data.entity_buffer.append(
+                Bullet(
+                    x, y,
+                    Vector2(0, direction * self.bullet_speed + extra),
+                    self.bullet_travel,
+                    self.bullet_damage
+                )
             )
-        )
 
         self.can_shoot = False
         self.timer_frequency.reset()
@@ -204,6 +219,7 @@ class Bullet(Kinetic):
         self.damage = damage
 
         self.starting_x = x
+        self.starting_y = y
 
     def set_location(self, x, y):
         super(Bullet, self).set_location(x, y)
@@ -215,7 +231,7 @@ class Bullet(Kinetic):
 
     def update(self, delta_time, scene_data):
 
-        if (abs(self.x - self.starting_x) > self.travel):
+        if (abs(self.x - self.starting_x) > self.travel or abs(self.y - self.starting_y) > self.travel):
             self.remove = True
 
         super(Bullet, self).update(delta_time, scene_data)
@@ -425,34 +441,65 @@ class PlayerA(Player):
         self.sprite = Sprite(self.x - 9, self.y - 16, SpriteType.PLAYERA)
         # Character specific stuff here.
         self.gun = BasicGun(self.x - 24, self.y + 8)
+        self.shooting_up = False
 
     def set_location(self, x, y):
         super(PlayerA, self).set_location(x, y)
         self.sprite.set_location(self.x - 9, self.y - 16)
 
-        # Facing Left
-        if (not self.sprite_flipped):
-            self.gun.set_location(self.x - 24, self.y + 8)
-            self.gun.face(Direction.LEFT)
+        if (not self.shooting_up):
+            # Facing Left
+            if (not self.sprite_flipped):
+                self.gun.set_location(self.x - 24, self.y + 8)
+                self.gun.face(Direction.LEFT)
+            else:
+                self.gun.set_location(self.x + self.width - 4, self.y + 8)
+                self.gun.face(Direction.RIGHT)
         else:
-            self.gun.set_location(self.x + self.width - 4, self.y + 8)
-            self.gun.face(Direction.RIGHT)
+            # Facing Left
+            if (not self.sprite_flipped):
+                self.gun.set_location(self.x - 14, self.y - 5)
+            else:
+                self.gun.set_location(self.x + 9, self.y - 5)
+
+            self.gun.face(Direction.UP)
 
     def __blast_em_logic(self, scene_data):
 
-        if (pressing(InputType.X)):
-            if (not self.sprite_flipped):
-                self.gun.fire(
-                    self.x - 24, self.y + 9,
-                    self.velocity.x,
-                    scene_data
-                )
-            else:
-                self.gun.fire(
-                    self.x + self.width + 4,
-                    self.y + 9,
-                    self.velocity.x,
-                    scene_data)
+        self.shooting_up = False
+
+        if (pressing(InputType.UP)):
+            if (pressing(InputType.X)):
+                self.shooting_up = True
+
+                if (not self.sprite_flipped):
+                    self.gun.fire(
+                        self.x - 12,
+                        self.y - 16,
+                        self.velocity.y,
+                        scene_data
+                    )
+                else:
+                    self.gun.fire(
+                        self.x + 10,
+                        self.y - 16,
+                        self.velocity.y,
+                        scene_data
+                    )
+        else:
+            if (pressing(InputType.X)):
+                if (not self.sprite_flipped):
+                    self.gun.fire(
+                        self.x - 24, self.y + 9,
+                        self.velocity.x,
+                        scene_data
+                    )
+                else:
+                    self.gun.fire(
+                        self.x + self.width + 4,
+                        self.y + 9,
+                        self.velocity.x,
+                        scene_data)
 
     def update(self, delta_time, scene_data):
         self.__blast_em_logic(scene_data)
