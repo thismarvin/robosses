@@ -534,14 +534,64 @@ class Boss(Entity):
     def __init__(self, x, y, width, height):
         super(Boss, self).__init__(x, y, width, height)
 
-    def hit(self):
-        pass
+        self.total_health = 1000
+        self.health = self.total_health
+        self.dead = False
+
+        self.health_bar_width = 192
+        self.health_bar_position = Vector2((320 - 192) / 2, 8)
+        self.health_bar = self.__update_health_bar()
+
+        self.padding = 4
+        self.health_bar_backing = Rect(
+            self.health_bar_position.x - self.padding,
+            self.health_bar_position.y - self.padding,
+            self.health_bar_width + self.padding * 2,
+            12 + self.padding * 2
+        )
+
+    def hit(self, damage):
+        if (self.dead):
+            return
+
+        self.health -= damage
+        self.health_bar = self.__update_health_bar()
+
+        if (self.health <= 0):
+            self.dead = True
+
+    def __update_health_bar(self):
+        return Rect(
+            self.health_bar_position.x,
+            self.health_bar_position.y,
+            self.health * self.health_bar_width / self.total_health,
+            12
+        )
 
     def update(self, delta_time, scene_data):
         pass
 
     def draw(self, surface):
-        pass
+        # Draw health bar
+        draw_rectangle(
+            surface,
+            self.health_bar_backing,
+            CameraType.STATIC,
+            Color.WHITE
+        )
+        draw_rectangle(
+            surface,
+            self.health_bar_backing,
+            CameraType.STATIC,
+            Color.BLACK,
+            2
+        )
+        draw_rectangle(
+            surface,
+            self.health_bar,
+            CameraType.STATIC,
+            Color.RED
+        )
 
 
 class Octopus(Boss):
@@ -558,6 +608,9 @@ class Octopus(Boss):
         self.sprite_left.draw(surface, CameraType.STATIC)
         self.sprite_right.draw(surface, CameraType.STATIC)
 
+        super(Octopus, self).draw(surface)
+
+
 class GolemPalm(Kinetic):
     def __init__(self, facing_left):
         super(GolemPalm, self).__init__(320, 240 - 32 - 103, 71, 103, 0)
@@ -570,14 +623,14 @@ class GolemPalm(Kinetic):
             self.sprite.flip_horizontally(True)
 
         # Kinetic needs this
-        self.query_result = None        
+        self.query_result = None
         self.area = Rect(
             self.x - 8,
             self.y - 8,
             self.width + 8 * 2,
             self.height + 8 * 2
         )
-    
+
     def set_location(self, x, y):
         super(GolemPalm, self).set_location(x, y)
         self.sprite.set_location(self.x, self.y)
@@ -608,7 +661,6 @@ class GolemPalm(Kinetic):
             if (globals.debugging):
                 e.set_color(Color.RED)
 
-
     def update(self, delta_time, scene_data):
         if (self.facing_left):
             if (self.x + self.width < 0):
@@ -624,7 +676,7 @@ class GolemPalm(Kinetic):
 
 
 class GolemHand(Kinetic):
-    def __init__(self, attack_time, facing_left):
+    def __init__(self, boss, attack_time, facing_left):
         super(GolemHand, self).__init__(320, 0, 69, 59, 0)
         self.sprite = Sprite(0, 64, SpriteType.GOLEM_FIST)
         if (not facing_left):
@@ -642,11 +694,14 @@ class GolemHand(Kinetic):
         self.__attack_speed = 300
         self.attack_timer = Timer(self.__attack_time, True)
 
+        self.boss = boss
+        self.color = Color.TEAL
+
         self.velocity = Vector2(0, 0)
         self.acceleration = Vector2(0, 0)
 
         # Kinetic needs this
-        self.query_result = None        
+        self.query_result = None
         self.area = Rect(
             self.x - 8,
             self.y - 8,
@@ -713,6 +768,17 @@ class GolemHand(Kinetic):
             if (globals.debugging):
                 e.set_color(Color.RED)
 
+        # Check collision against Kinetic stuff (ugly I know)
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.boss.hit(e.damage)
+                    e.remove = True
 
     def update(self, delta_time, scene_data):
         self.attack_timer.update(delta_time)
@@ -720,11 +786,19 @@ class GolemHand(Kinetic):
             self.seek(delta_time, scene_data)
         else:
             self.attack()
-        
+
         super(GolemHand, self).update(delta_time, scene_data)
 
     def draw(self, surface):
-        self.sprite.draw(surface, CameraType.STATIC)
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.DYNAMIC,
+                self.color
+            )
+        else:
+            self.sprite.draw(surface, CameraType.STATIC)
 
 
 class Golem(Boss):
@@ -734,12 +808,12 @@ class Golem(Boss):
         self.sprite_body_right = Sprite(80 + 5 * 16, 16, SpriteType.GOLEM_BODY)
         self.sprite_body_right.flip_horizontally(True)
 
-        self.right_hand = GolemHand(2500, False)
-        self.left_hand = GolemHand(4500, True)
+        self.right_hand = GolemHand(self, 2500, False)
+        self.left_hand = GolemHand(self, 4500, True)
         self.palms = []
         self.palm_timer = Timer(10000, True)
         self.palm_chance = 0.5
-        
+
     def update(self, delta_time, scene_data):
         self.palm_timer.update(delta_time)
         if (self.palm_timer.done):
@@ -764,3 +838,5 @@ class Golem(Boss):
         self.left_hand.draw(surface)
         for p in self.palms:
             p.draw(surface)
+
+        super(Golem, self).draw(surface)

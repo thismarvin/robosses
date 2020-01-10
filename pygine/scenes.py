@@ -476,6 +476,11 @@ class BossB(BossBattle):
 
         self.entities.append(Golem())
 
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
+
     def update(self, delta_time):
         super(BossB, self).update(delta_time)
 
