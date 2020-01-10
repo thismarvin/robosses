@@ -383,7 +383,7 @@ class Select(Scene):
             OnButtonPressTrigger(
                 InputType.A,
                 Vector2(-128, -128),
-                SceneType.BOSSA
+                SceneType.BOSSB
             )
         ]
 
@@ -473,6 +473,8 @@ class BossB(BossBattle):
             Block(0, self.scene_bounds.height -
                   32, self.scene_bounds.width, 32)
         )
+
+        self.entities.append(Golem())
 
     def update(self, delta_time):
         super(BossB, self).update(delta_time)
