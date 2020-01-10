@@ -534,7 +534,7 @@ class Boss(Entity):
     def __init__(self, x, y, width, height):
         super(Boss, self).__init__(x, y, width, height)
 
-        self.total_health = 1000
+        self.total_health = 10000
         self.health = self.total_health
         self.dead = False
 
@@ -609,7 +609,6 @@ class OctoArm(Kinetic):
 
         self.attacking = False
         self.attack_stage = 0
-        self.timer_attack = Timer(1000, True)
 
         # Kinetic needs this
         self.query_result = None
@@ -651,23 +650,22 @@ class OctoArm(Kinetic):
             self.height + 16 * 2
         )
 
-        #self.query_result = scene_data.entity_quad_tree.query(self.area)
-
-        # for e in self.query_result:
-        #    if e is self:
-        #        continue
-
-        #    if (globals.debugging):
-        #        e.set_color(Color.RED)
-
-    def __update_attack(self, delta_time):
-        if (self.attacking):
+        if (not self.attacking):
             return
 
-        self.timer_attack.update(delta_time)
-        if (self.timer_attack.done):
-            self.attack()
-            self.timer_attack.reset()
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if (globals.debugging):
+                e.set_color(Color.RED)
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.boss.hit(e.damage * 0.1)
+                    e.remove = True
 
     def __update_attack_logic(self):
         if (not self.attacking):
@@ -714,10 +712,8 @@ class OctoArm(Kinetic):
                 self.velocity.x = 0
 
                 self.attacking = False
-                self.timer_attack.start()
 
     def update(self, delta_time, scene_data):
-        self.__update_attack(delta_time)
         self.__update_attack_logic()
         super(OctoArm, self).update(delta_time, scene_data)
 
@@ -745,10 +741,11 @@ class OctoBlaster(Kinetic):
 
         self.attacking = False
         self.attack_stage = 0
-        self.timer_attack = Timer(3000, True)
 
         self.wall = Direction.LEFT
         self.timer_seek = Timer(1500)
+
+        self.timer_charge = Timer(500)
 
         self.laser = Rect(self.x, self.y, 0, 0)
         self.timer_laser = Timer(2000)
@@ -789,7 +786,7 @@ class OctoBlaster(Kinetic):
             )
             self.sprite.set_sprite(SpriteType.OCTOPUS_GUN)
             self.sprite.flip_horizontally(True)
-            self.acceleration.x = -50
+            self.acceleration.x = -175
 
         elif (side == 1):
             self.wall = Direction.LEFT
@@ -798,7 +795,7 @@ class OctoBlaster(Kinetic):
                 randint(16, 240 - 80)
             )
             self.sprite.set_sprite(SpriteType.OCTOPUS_GUN)
-            self.acceleration.x = 50
+            self.acceleration.x = 175
 
         self.timer_seek.start()
 
@@ -816,23 +813,22 @@ class OctoBlaster(Kinetic):
             self.height + 16 * 2
         )
 
-        #self.query_result = scene_data.entity_quad_tree.query(self.area)
-
-        # for e in self.query_result:
-        #    if e is self:
-        #        continue
-
-        #    if (globals.debugging):
-        #        e.set_color(Color.RED)
-
-    def __update_attack(self, delta_time):
-        if (self.attacking):
+        if (not self.attacking):
             return
 
-        self.timer_attack.update(delta_time)
-        if (self.timer_attack.done):
-            self.attack()
-            self.timer_attack.reset()
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if (globals.debugging):
+                e.set_color(Color.RED)
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.boss.hit(e.damage * 0.1)
+                    e.remove = True
 
     def __update_attack_logic(self, delta_time, scene_data):
         if (not self.attacking):
@@ -866,8 +862,8 @@ class OctoBlaster(Kinetic):
                         self.laser = Rect(
                             self.x + 72, self.y + 6, 320 * 0.5, self.height)
                     elif (self.wall == Direction.RIGHT):
-                        self.laser = Rect(
-                            320 * 0.5 - 72, self.y + 6, 320 * 0.5, self.height)
+                        self.laser = Rect(self.x - 320 * 0.5, self.y +
+                                          6, 320 * 0.5, self.height)
 
                 else:
                     self.acceleration.y = (scene_data.actor.y - self.y) * 0.6
@@ -878,11 +874,22 @@ class OctoBlaster(Kinetic):
                 self.timer_seek.reset()
 
         elif (self.attack_stage == 2):
+            self.timer_charge.start()
+            self.timer_charge.update(delta_time)
+            if (self.timer_charge.done):
+                self.timer_charge.reset()
+
+                direction = -1 if self.wall == Direction.LEFT else 1
+                self.acceleration.x = direction * 30
+                self.velocity.y *= 0.5
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 3):
             if (self.wall == Direction.LEFT):
                 self.laser = Rect(self.x + 72, self.y + 6,
                                   320 * 0.5, self.height)
             elif (self.wall == Direction.RIGHT):
-                self.laser = Rect(320 * 0.5 - 72, self.y +
+                self.laser = Rect(self.x - 320 * 0.5, self.y +
                                   6, 320 * 0.5, self.height)
 
             self.timer_laser.start()
@@ -895,7 +902,7 @@ class OctoBlaster(Kinetic):
                 self.timer_laser.reset()
                 self.attack_stage += 1
 
-        elif (self.attack_stage == 3):
+        elif (self.attack_stage == 4):
             if (
                 (self.wall == Direction.LEFT and self.x + self.width < -64) or
                 (self.wall == Direction.RIGHT and self.x > 320 + 64)
@@ -904,10 +911,8 @@ class OctoBlaster(Kinetic):
                 self.velocity = Vector2(0, 0)
 
                 self.attacking = False
-                self.timer_attack.start()
 
     def update(self, delta_time, scene_data):
-        self.__update_attack(delta_time)
         self.__update_attack_logic(delta_time, scene_data)
         super(OctoBlaster, self).update(delta_time, scene_data)
 
@@ -922,7 +927,7 @@ class OctoBlaster(Kinetic):
         else:
             self.sprite.draw(surface, CameraType.STATIC)
 
-            if (self.attack_stage == 2):
+            if (self.attack_stage == 3):
                 draw_rectangle(
                     surface,
                     self.laser,
@@ -933,7 +938,7 @@ class OctoBlaster(Kinetic):
 
 class Octopus(Boss):
     def __init__(self):
-        super(Octopus, self).__init__(0, 0, 16, 16)
+        super(Octopus, self).__init__(96, 64, 128, 48)
         self.sprite_left = Sprite(0, 0, SpriteType.OCTOPUS)
         self.sprite_right = Sprite(160, 0, SpriteType.OCTOPUS)
         self.sprite_right.flip_horizontally(True)
@@ -943,7 +948,112 @@ class Octopus(Boss):
 
         self.blaster = OctoBlaster(self)
 
+        self.stage = 0
+        self.attacking = False
+        self.attack_started = False
+        self.attack_type = 0
+        self.timer_attack = Timer(2500)
+
+        self.query_result = None
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
+    def __update_timer(self, delta_time):
+        if (self.attacking):
+            return
+
+        self.timer_attack.start()
+        self.timer_attack.update(delta_time)
+        if (self.timer_attack.done):
+            self.attacking = True
+            self.timer_attack.reset()
+
+    def __strategize(self, scene_data):
+        if (not self.attacking or self.attack_started):
+            return
+
+        if (self.stage == 0):
+            if (randint(0, 9) < 4):
+                self.left_arm.attack()
+                self.right_arm.attack()
+            else:
+                if (
+                    scene_data.actor.x + scene_data.actor.width /
+                        2 < scene_data.scene_bounds.width * 0.5
+                ):
+                    self.left_arm.attack()
+                else:
+                    self.right_arm.attack()
+        else:
+            if (
+                scene_data.actor.x + scene_data.actor.width / 2 < scene_data.scene_bounds.width * 0.33 or
+                scene_data.actor.x + scene_data.actor.width /
+                    2 > scene_data.scene_bounds.width * 0.66
+            ):
+                if (randint(0, 9) < 6):
+                    self.left_arm.attack()
+                    self.right_arm.attack()
+                else:
+                    if (randint(0, 9) < 5):
+                        self.left_arm.attack()
+                    else:
+                        self.right_arm.attack()
+                self.attack_type = 0
+
+            else:
+                self.blaster.attack()
+                self.attack_type = 1
+
+        self.attack_started = True
+
+    def __await_attack_result(self):
+        if (not self.attack_started):
+            return
+
+        if (self.attack_type == 0):
+            if (not self.left_arm.attacking and not self.right_arm.attacking):
+                self.attack_started = False
+                self.attacking = False
+
+        elif (self.attack_type == 1):
+            if (not self.blaster.attacking):
+                self.attack_started = False
+                self.attacking = False
+
+    def __update_stage(self):
+        if (self.health < self.total_health * 0.5):
+            self.stage = 1
+            self.timer_attack.length = 1234
+        else:
+            self.stage = 0
+
+    def __collision(self, scene_data):
+
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.hit(e.damage)
+                    e.remove = True
+
     def update(self, delta_time, scene_data):
+
+        self.__update_stage()
+
+        self.__update_timer(delta_time)
+        self.__strategize(scene_data)
+        self.__await_attack_result()
+
+        self.__collision(scene_data)
+
         self.left_arm.update(delta_time, scene_data)
         self.right_arm.update(delta_time, scene_data)
         self.blaster.update(delta_time, scene_data)
@@ -957,6 +1067,14 @@ class Octopus(Boss):
         self.right_arm.draw(surface)
 
         self.blaster.draw(surface)
+
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.STATIC,
+                Color.BLUE
+            )
 
         super(Octopus, self).draw(surface)
 
