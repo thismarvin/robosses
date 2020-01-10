@@ -156,7 +156,7 @@ class Sprite(PygineObject):
         elif (self.type == SpriteType.GUN_0_H):
             self.__sprite_setup(64, 32, 26, 19)
         elif (self.type == SpriteType.GUN_0_V):
-            self.__sprite_setup(82, 77, 19, 26)
+            self.__sprite_setup(64, 52, 19, 26)
         elif (self.type == SpriteType.BULLET):
             self.__sprite_setup(96, 32, 16, 16)
 
