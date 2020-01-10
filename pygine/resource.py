@@ -67,6 +67,11 @@ class SpriteType(IntEnum):
     OCTOPUS = 9
 
 
+    GUN_0_H = 24
+    GUN_0_V = 25
+    BULLET = 26
+
+
 class Sprite(PygineObject):
     def __init__(self, x, y, sprite_type=SpriteType.NONE):
         super(Sprite, self).__init__(x, y, 0, 0)
@@ -147,6 +152,13 @@ class Sprite(PygineObject):
         elif (self.type == SpriteType.OCTOPUS):
             self.__sprite_setup(0, 0, 160, 176)
             self.sprite_sheet = BOSS_SPRITES[0]
+
+        elif (self.type == SpriteType.GUN_0_H):
+            self.__sprite_setup(64, 32, 26, 19)
+        elif (self.type == SpriteType.GUN_0_V):
+            self.__sprite_setup(64, 52, 19, 26)
+        elif (self.type == SpriteType.BULLET):
+            self.__sprite_setup(96, 32, 16, 16)
 
         self.__apply_changes_to_sprite()
 
