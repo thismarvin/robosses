@@ -594,6 +594,145 @@ class Boss(Entity):
         )
 
 
+class OctoArm(Kinetic):
+    def __init__(self, boss, is_right):
+        super(OctoArm, self).__init__(-128, 240 - 32 - 32, 128, 16, 0)
+
+        self.boss = boss
+        self.is_right = is_right
+
+        self.color = Color.GRASS_GREEN
+        self.sprite = Sprite(self.x, self.y - 32, SpriteType.OCTOPUS_ARM)
+        if (self.is_right):
+            self.set_location(320, self.y)
+            self.sprite.flip_horizontally(True)
+
+        self.attacking = False
+        self.attack_stage = 0
+        self.timer_attack = Timer(1000, True)
+
+        # Kinetic needs this
+        self.query_result = None
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
+    def set_location(self, x, y):
+        super(OctoArm, self).set_location(x, y)
+        if (not self.is_right):
+            self.sprite.set_location(self.x, self.y - 32)
+        else:
+            self.sprite.set_location(self.x - 16, self.y - 32)
+
+    def attack(self):
+        if (self.attacking):
+            return
+
+        self.attacking = True
+        self.attack_stage = 0
+
+        direction = -1 if self.is_right else 1
+        self.acceleration.x = 500 * direction
+
+    def _collision(self, scene_data):
+        self._update_collision_rectangles()
+
+        if (globals.debugging):
+            for e in scene_data.entities:
+                e.set_color(Color.WHITE)
+
+        self.area = Rect(
+            self.x - 16,
+            self.y - 16,
+            self.width + 16 * 2,
+            self.height + 16 * 2
+        )
+
+        #self.query_result = scene_data.entity_quad_tree.query(self.area)
+
+        # for e in self.query_result:
+        #    if e is self:
+        #        continue
+
+        #    if (globals.debugging):
+        #        e.set_color(Color.RED)
+
+    def __update_attack(self, delta_time):
+        if (self.attacking):
+            return
+
+        self.timer_attack.update(delta_time)
+        if (self.timer_attack.done):
+            self.attack()
+            self.timer_attack.reset()
+
+    def __update_attack_logic(self):
+        if (not self.attacking):
+            return
+
+        extend = 64
+        if (self.attack_stage == 0):
+            if (
+                (not self.is_right and self.x + self.width > extend) or
+                (self.is_right and self.x < 320 - extend)
+            ):
+                self.acceleration.x = 0
+                self.velocity.x = 0
+
+                direction = -1 if self.is_right else 1
+                self.acceleration.x = 100 * direction
+                self.acceleration.y = -750
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 1):
+
+            if (self.y < 32):
+                self.acceleration.y = 0
+                self.velocity.y = 0
+
+                self.acceleration.y = 1000
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 2):
+            if (self.y > 240 - 32 - 32):
+                self.acceleration.y = 0
+                self.velocity.y = 0
+
+                direction = 1 if self.is_right else -1
+                self.acceleration.x = 300 * direction
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 3):
+            if (
+                (not self.is_right and self.x + self.width < 0) or
+                (self.is_right and self.x > 320)
+            ):
+                self.acceleration.x = 0
+                self.velocity.x = 0
+
+                self.attacking = False
+                self.timer_attack.start()
+
+    def update(self, delta_time, scene_data):
+        self.__update_attack(delta_time)
+        self.__update_attack_logic()
+        super(OctoArm, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.STATIC,
+                self.color
+            )
+        else:
+            self.sprite.draw(surface, CameraType.STATIC)
+
+
 class Octopus(Boss):
     def __init__(self):
         super(Octopus, self).__init__(0, 0, 16, 16)
@@ -601,12 +740,20 @@ class Octopus(Boss):
         self.sprite_right = Sprite(160, 0, SpriteType.OCTOPUS)
         self.sprite_right.flip_horizontally(True)
 
+        self.left_arm = OctoArm(self, False)
+        self.right_arm = OctoArm(self, True)
+
     def update(self, delta_time, scene_data):
-        pass
+        self.left_arm.update(delta_time, scene_data)
+        self.right_arm.update(delta_time, scene_data)
 
     def draw(self, surface):
+        # Draw Body
         self.sprite_left.draw(surface, CameraType.STATIC)
         self.sprite_right.draw(surface, CameraType.STATIC)
+        # Draw Arms
+        self.left_arm.draw(surface)
+        self.right_arm.draw(surface)
 
         super(Octopus, self).draw(surface)
 
