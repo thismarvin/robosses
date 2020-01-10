@@ -30,6 +30,9 @@ class SceneManager:
         return self.__current_scene
 
     def queue_next_scene(self, scene_type):
+        if (self.start_transition):
+            return
+
         self.__previous_scene = self.__current_scene
         self.__next_scene = self.__all_scenes[int(scene_type)]
         self.__setup_transition()
@@ -103,6 +106,8 @@ class SceneManager:
                     self.enter_transition.draw(surface)
             else:
                 self.enter_transition.draw(surface)
+                if (self.enter_transition.done):
+                    self.start_transition = False
 
     def draw(self, surface):
         assert (self.__current_scene != None), \
