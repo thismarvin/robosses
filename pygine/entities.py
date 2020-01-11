@@ -1148,7 +1148,7 @@ class GolemHand(Kinetic):
         super(GolemHand, self).__init__(320, 0, 69, 59, 0)
         self.sprite = Sprite(0, 64, SpriteType.GOLEM_FIST)
         if (not facing_left):
-            self.set_location(0, 0)
+            self.set_location(-69, 0)
             self.sprite.flip_horizontally(True)
         self.init_y = 0
 
@@ -1294,31 +1294,47 @@ class Golem(Boss):
         self.sprite_body_right = Sprite(80 + 5 * 16, 16, SpriteType.GOLEM_BODY)
         self.sprite_body_right.flip_horizontally(True)
 
-        self.right_hand = None
+        self.right_hand = GolemHand(self, 2500, False)
         self.left_hand = GolemHand(self, 4500, True)
         self.palms = []
         self.palm_timer = Timer(10000, False)
-        self.palm_chance = 0.5
+        self.next_checkpoint = self.total_health * 0.75
 
     def __change_stage(self):
         if (self.health < self.total_health * 0.25):
-            # enter final stage TODO
-            pass
+            # final stage: faster smashes, even more palms
+            print("stage 3")
+            self.palm_timer.length = 5500
+            self.right_hand.attack_timer.length = 2000
+            self.left_hand.attack_timer.length = 3500
+            self.right_hand.rising_speed *= 2
+            self.left_hand.rising_speed *= 2
+            self.next_checkpoint = -1
         elif (self.health < self.total_health * 0.5):
-            # stage 2
-            pass
+            # stage 2: more palms
+            print("stage 2")
+            self.palm_timer.length = 7000
+            self.next_checkpoint = self.total_health * 0.25
         elif (self.health < self.total_health * 0.75):
-            # stage 1
-            pass
+            # stage 1: enable palms
+            print("stage 1")
+            self.palms.append(GolemPalm(True))
+            self.palm_timer.reset()
+            self.palm_timer.start()
+            self.next_checkpoint = self.total_health * 0.5
+
+    def __update_stage_change(self):
+        if self.health < self.next_checkpoint:
+            self.__change_stage()
 
     def update(self, delta_time, scene_data):
+        self.__update_stage_change()
         self.palm_timer.update(delta_time)
         if (self.palm_timer.done):
-            if (random.random() < self.palm_chance):
-                if (random.random() < 0.5):
-                    self.palms.append(GolemPalm(True))
-                else:
-                    self.palms.append(GolemPalm(False))
+            if (random.random() < 0.5):
+                self.palms.append(GolemPalm(True))
+            else:
+                self.palms.append(GolemPalm(False))
             self.palm_timer.reset()
             self.palm_timer.start()
 
@@ -1331,6 +1347,7 @@ class Golem(Boss):
             self.left_hand.seek_ofs = 0
 
         self.right_hand.update(delta_time, scene_data)
+
         self.left_hand.update(delta_time, scene_data)
         for p in self.palms:
             p.update(delta_time, scene_data)
