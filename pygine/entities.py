@@ -1303,7 +1303,6 @@ class Golem(Boss):
     def __change_stage(self):
         if (self.health < self.total_health * 0.25):
             # final stage: faster smashes, even more palms
-            print("stage 3")
             self.palm_timer.length = 5500
             self.right_hand.attack_timer.length = 2000
             self.left_hand.attack_timer.length = 3500
@@ -1312,12 +1311,10 @@ class Golem(Boss):
             self.next_checkpoint = -1
         elif (self.health < self.total_health * 0.5):
             # stage 2: more palms
-            print("stage 2")
             self.palm_timer.length = 7000
             self.next_checkpoint = self.total_health * 0.25
         elif (self.health < self.total_health * 0.75):
             # stage 1: enable palms
-            print("stage 1")
             self.palms.append(GolemPalm(True))
             self.palm_timer.reset()
             self.palm_timer.start()
