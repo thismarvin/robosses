@@ -1156,11 +1156,12 @@ class GolemHand(Kinetic):
         self.resting = False
         self.rising = False
 
-        self.__seek_speed = 70
-        self.__seek_ofs = 0 #64 if facing_left else -64
-        self.__seek_accel = 50
-        self.__attack_accel = 500
-        self.__attack_speed = 300
+        self.seek_speed = 70
+        self.seek_ofs = 0 #64 if facing_left else -64
+        self.seek_accel = 50 # lower = faster
+        self.attack_accel = 500
+        self.attack_speed = 300
+        self.rising_speed = -30
         self.attack_timer = Timer(attack_time, True)
         self.rest_timer = Timer(2500, False)
 
@@ -1185,8 +1186,8 @@ class GolemHand(Kinetic):
 
     def attack(self):
         self.velocity.x = 0
-        self.velocity.y = self.__attack_speed
-        self.acceleration.y = self.__attack_accel
+        self.velocity.y = self.attack_speed
+        self.acceleration.y = self.attack_accel
         if (self.attack_finished):
             self.attack_finished = False
             self.acceleration.y = 0
@@ -1195,17 +1196,17 @@ class GolemHand(Kinetic):
             self.rest_timer.start()
 
     def seek(self, delta_time, scene_data):
-        centerPlayer = scene_data.actor.x + scene_data.actor.width / 2 + self.__seek_ofs
+        centerPlayer = scene_data.actor.x + scene_data.actor.width / 2 + self.seek_ofs
         centerHand = self.x + self.width / 2
         distance = centerPlayer - centerHand
-        new_vel = distance * distance / self.__seek_accel
+        new_vel = distance * distance / self.seek_accel
         if (distance < 0):
             self.velocity = Vector2(-new_vel, 0)
         elif (centerPlayer - centerHand > 0):
             self.velocity = Vector2(new_vel, 0)
 
-        if (abs(self.velocity.x) > self.__seek_speed):
-            self.velocity.x = self.__seek_speed if self.velocity.x > 0 else -self.__seek_speed
+        if (abs(self.velocity.x) > self.seek_speed):
+            self.velocity.x = self.seek_speed if self.velocity.x > 0 else -self.seek_speed
 
     def __rectanlge_collision_logic(self, entity):
         if self.collision_rectangles[1].colliderect(entity.bounds) and self.velocity.y > 0:
@@ -1261,7 +1262,7 @@ class GolemHand(Kinetic):
                 self.resting = False
                 self.rising = True
         elif (self.rising):
-            self.velocity.y = -30
+            self.velocity.y = self.rising_speed
             if (self.y <= 0):
                 self.velocity.y = 0
                 self.rising = False
@@ -1293,11 +1294,22 @@ class Golem(Boss):
         self.sprite_body_right = Sprite(80 + 5 * 16, 16, SpriteType.GOLEM_BODY)
         self.sprite_body_right.flip_horizontally(True)
 
-        self.right_hand = GolemHand(self, 2500, False)
+        self.right_hand = None
         self.left_hand = GolemHand(self, 4500, True)
         self.palms = []
-        self.palm_timer = Timer(10000, True)
+        self.palm_timer = Timer(10000, False)
         self.palm_chance = 0.5
+
+    def __change_stage(self):
+        if (self.health < self.total_health * 0.25):
+            # enter final stage TODO
+            pass
+        elif (self.health < self.total_health * 0.5):
+            # stage 2
+            pass
+        elif (self.health < self.total_health * 0.75):
+            # stage 1
+            pass
 
     def update(self, delta_time, scene_data):
         self.palm_timer.update(delta_time)
@@ -1309,6 +1321,14 @@ class Golem(Boss):
                     self.palms.append(GolemPalm(False))
             self.palm_timer.reset()
             self.palm_timer.start()
+
+        if (not self.right_hand.attack_timer.done and not self.left_hand.attack_timer.done):
+            # both in air
+            self.right_hand.seek_ofs = -64
+            self.left_hand.seek_ofs = 64
+        else:
+            self.right_hand.seek_ofs = 0
+            self.left_hand.seek_ofs = 0
 
         self.right_hand.update(delta_time, scene_data)
         self.left_hand.update(delta_time, scene_data)
