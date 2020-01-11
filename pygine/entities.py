@@ -1153,14 +1153,16 @@ class GolemHand(Kinetic):
         self.init_y = 0
 
         self.attack_finished = False
+        self.resting = False
+        self.rising = False
 
-        self.__attack_time = attack_time
         self.__seek_speed = 70
-        self.__seek_ofs = 64 if facing_left else -64
+        self.__seek_ofs = 0 #64 if facing_left else -64
         self.__seek_accel = 50
         self.__attack_accel = 500
         self.__attack_speed = 300
-        self.attack_timer = Timer(self.__attack_time, True)
+        self.attack_timer = Timer(attack_time, True)
+        self.rest_timer = Timer(2500, False)
 
         self.boss = boss
         self.color = Color.TEAL
@@ -1188,9 +1190,9 @@ class GolemHand(Kinetic):
         if (self.attack_finished):
             self.attack_finished = False
             self.acceleration.y = 0
-            self.y = self.init_y
-            self.attack_timer.reset()
-            self.attack_timer.start()
+            self.resting = True
+            self.rest_timer.reset()
+            self.rest_timer.start()
 
     def seek(self, delta_time, scene_data):
         centerPlayer = scene_data.actor.x + scene_data.actor.width / 2 + self.__seek_ofs
@@ -1250,9 +1252,24 @@ class GolemHand(Kinetic):
 
     def update(self, delta_time, scene_data):
         self.attack_timer.update(delta_time)
+        self.rest_timer.update(delta_time)
+
         if (not self.attack_timer.done):
             self.seek(delta_time, scene_data)
+        elif (self.resting):
+            if (self.rest_timer.done):
+                self.resting = False
+                self.rising = True
+        elif (self.rising):
+            self.velocity.y = -30
+            if (self.y <= 0):
+                self.velocity.y = 0
+                self.rising = False
+                self.attack_timer.reset()
+                self.attack_timer.start()
         else:
+            if (self.y + self.height >= scene_data.scene_bounds.height - 32):
+                self.attack_finished = True
             self.attack()
 
         super(GolemHand, self).update(delta_time, scene_data)
