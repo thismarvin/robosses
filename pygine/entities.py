@@ -290,6 +290,17 @@ class Player(Actor):
 
         self.sprite_flipped = False
 
+        self.total_health = 3
+        self.health = self.total_health
+        self.dead = False
+
+        self.flashes = 4
+        self.invinsible_duration = 1600
+        self.timer_invinsible = Timer(self.invinsible_duration)
+        self.timer_flash = Timer(self.invinsible_duration / (self.flashes * 2))
+        self.damaged = False
+        self.flashing = False
+
         self.entered_arena = False
 
         self.area = Rect(
@@ -306,11 +317,51 @@ class Player(Actor):
         self.grounded = False
         self.jumping = False
 
+        self.health = self.total_health
+        self.dead = False
+        self.damaged = False
+        self.flashing = False
+
+        self.entered_arena = False
+
+    def take_damage(self):
+        if (self.damaged):
+            return
+
+        self.damaged = True
+        self.health -= 1
+
+        if (self.health <= 0):
+            self.dead = True
+            self.velocity.y = -self.initial_jump_velocity * 0.6
+        else:
+            self.timer_invinsible.start()
+            self.timer_flash.start()
+
     def enter_arena(self):
-        self.reset()
         self.entered_arena = True
 
+    def __update_health(self, delta_time):
+        if (not self.damaged or self.dead):
+            return
+
+        self.timer_invinsible.update(delta_time)
+        self.timer_flash.update(delta_time)
+
+        if (self.timer_flash.done):
+            self.flashing = not self.flashing
+            self.timer_flash.reset()
+            self.timer_flash.start()
+
+        if (self.timer_invinsible.done):
+            self.damaged = False
+            self.flashing = False
+            self.timer_invinsible.reset()
+
     def _update_input(self):
+        if (self.dead):
+            return
+
         if (pressing(InputType.LEFT) and not pressing(InputType.RIGHT)):
             self.acceleration.x = -self.lateral_acceleration
 
@@ -373,6 +424,9 @@ class Player(Actor):
     def _collision(self, scene_data):
         self._update_collision_rectangles()
 
+        if (self.dead):
+            return
+
         if (globals.debugging):
             for e in scene_data.entities:
                 e.set_color(Color.WHITE)
@@ -413,6 +467,7 @@ class Player(Actor):
             return
 
         self._update_input()
+        self.__update_health(delta_time)
 
         super(Player, self).update(delta_time, scene_data)
 
@@ -433,7 +488,8 @@ class Player(Actor):
                 1
             )
         else:
-            self.sprite.draw(surface, CameraType.DYNAMIC)
+            if (not self.flashing):
+                self.sprite.draw(surface, CameraType.DYNAMIC)
 
 
 class PlayerA(Player):
@@ -533,7 +589,6 @@ class Block(Entity):
 class Boss(Entity):
     def __init__(self, x, y, width, height):
         super(Boss, self).__init__(x, y, width, height)
-
         self.total_health = 10000
         self.health = self.total_health
         self.dead = False
@@ -549,6 +604,11 @@ class Boss(Entity):
             self.health_bar_width + self.padding * 2,
             12 + self.padding * 2
         )
+
+    def reset(self):
+        self.health = self.total_health
+        self.health_bar = self.__update_health_bar()
+        self.dead = False
 
     def hit(self, damage):
         if (self.dead):
@@ -666,6 +726,10 @@ class OctoArm(Kinetic):
                 if (self.bounds.colliderect(e.bounds)):
                     self.boss.hit(e.damage * 0.1)
                     e.remove = True
+
+            if isinstance(e, Player):
+                if (self.bounds.colliderect(e.bounds)):
+                    e.take_damage()
 
     def __update_attack_logic(self):
         if (not self.attacking):
@@ -830,6 +894,10 @@ class OctoBlaster(Kinetic):
                     self.boss.hit(e.damage * 0.1)
                     e.remove = True
 
+        if (self.attack_stage == 3):
+            if (self.laser.colliderect(scene_data.actor.bounds)):
+                scene_data.actor.take_damage()
+
     def __update_attack_logic(self, delta_time, scene_data):
         if (not self.attacking):
             return
@@ -945,7 +1013,6 @@ class Octopus(Boss):
 
         self.left_arm = OctoArm(self, False)
         self.right_arm = OctoArm(self, True)
-
         self.blaster = OctoBlaster(self)
 
         self.stage = 0
@@ -961,6 +1028,19 @@ class Octopus(Boss):
             self.width + 8 * 2,
             self.height + 8 * 2
         )
+
+    def reset(self):
+        self.left_arm = OctoArm(self, False)
+        self.right_arm = OctoArm(self, True)
+        self.blaster = OctoBlaster(self)
+
+        self.stage = 0
+        self.attacking = False
+        self.attack_started = False
+        self.attack_type = 0
+        self.timer_attack = Timer(2500)
+
+        super(Octopus, self).reset()
 
     def __update_timer(self, delta_time):
         if (self.attacking):
@@ -998,15 +1078,23 @@ class Octopus(Boss):
                     self.left_arm.attack()
                     self.right_arm.attack()
                 else:
-                    if (randint(0, 9) < 5):
+                    if (
+                        scene_data.actor.x + scene_data.actor.width /
+                            2 < scene_data.scene_bounds.width * 0.5
+                    ):
                         self.left_arm.attack()
                     else:
                         self.right_arm.attack()
-                self.attack_type = 0
 
+                self.attack_type = 0
             else:
-                self.blaster.attack()
-                self.attack_type = 1
+                if (randint(0, 9) < 2):
+                    self.left_arm.attack()
+                    self.right_arm.attack()
+                    self.attack_type = 0
+                else:
+                    self.blaster.attack()
+                    self.attack_type = 1
 
         self.attack_started = True
 
