@@ -78,6 +78,7 @@ class SceneManager:
 
     def __change_scenes(self):
         self.__current_scene = self.__next_scene
+        self.__current_scene.load_scene()
 
     def __update_input(self, delta_time):
         if pressed(InputType.RESET):
@@ -282,6 +283,9 @@ class Scene(object):
             self.camera.get_viewport_top_left().x - Scene.VIEWPORT_BUFFER,
             self.camera.get_viewport_top_left().y - Scene.VIEWPORT_BUFFER)
 
+    def load_scene(self):
+        pass
+
     def update(self, delta_time):
         self.__update_spatial_partitioning()
         self.scene_data.update(
@@ -388,11 +392,14 @@ class Select(Scene):
             OnButtonPressTrigger(
                 InputType.A,
                 Vector2(-128, -128),
-                SceneType.BOSSB
+                SceneType.BOSSA
             )
         ]
 
     def update(self, delta_time):
+        # TEMP
+        self.actor.set_location(-128, -128)
+
         super(Select, self).update(delta_time)
 
     def draw(self, surface):
@@ -410,12 +417,23 @@ class BossBattle(Scene):
         self.player_released = False
         self.release_timer = Timer(1000)
 
+        self.initialized = False
+
+    def load_scene(self):
+        self.initialized = False
+
     def _reset(self):
         self.set_scene_bounds(
             Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
         self.entities = []
         self.sprites = []
         self.shapes = []
+
+    def _soft_reset(self):
+        self._reset_arena()
+        self.player_released = False
+        self.release_timer.reset()
+        self.release_timer.start()
 
     def _create_triggers(self):
         self.triggers = []
@@ -424,16 +442,34 @@ class BossBattle(Scene):
         raise NotImplementedError(
             "A class that inherits BossBattle did not implement the _create_arena() method")
 
-    def update(self, delta_time):
+    def _reset_arena(self):
+        raise NotImplementedError(
+            "A class that inherits BossBattle did not implement the _reset_arena() method")
+
+    def __initialize_arena(self):
+        if (self.initialized):
+            return
+
         if (not self.arena_setup):
             self._create_arena()
-            self.release_timer.start()
             self.arena_setup = True
+            self.release_timer.start()
+        else:
+            self._soft_reset()
+
+        self.initialized = True
+
+    def update(self, delta_time):
+
+        self.__initialize_arena()
 
         self.release_timer.update(delta_time)
         if (not self.player_released and self.release_timer.done):
             self.actor.enter_arena()
             self.player_released = True
+
+        if (self.actor.dead and self.actor.y > self.scene_bounds.height + 16):
+            self._soft_reset()
 
         super(BossBattle, self).update(delta_time)
 
@@ -447,6 +483,7 @@ class BossA(BossBattle):
         super(BossA, self).__init__()
         self.background.set_sprite(SpriteType.BACKGROUND_0)
         self.release_timer = Timer(500)
+        self.octopus = Octopus()
 
     def _create_arena(self):
         self.entities.append(
@@ -454,7 +491,16 @@ class BossA(BossBattle):
                   32, self.scene_bounds.width, 32)
         )
 
-        self.entities.append(Octopus())
+        self.entities.append(self.octopus)
+
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
+
+    def _reset_arena(self):
+        self.actor.reset()
+        self.octopus.reset()
 
         self.actor.set_location(
             (self.scene_bounds.width - self.actor.width / 2) / 2,
@@ -462,6 +508,9 @@ class BossA(BossBattle):
         )
 
     def update(self, delta_time):
+        if (self.octopus.dead):
+            self.manager.queue_next_scene(SceneType.MENU)
+
         super(BossA, self).update(delta_time)
 
     def draw(self, surface):

@@ -317,18 +317,32 @@ class Player(Actor):
         self.grounded = False
         self.jumping = False
 
+        self.health = self.total_health
+        self.dead = False
+        self.damaged = False
+        self.flashing = False
+
+        self.entered_arena = False
+
     def take_damage(self):
+        if (self.damaged):
+            return
+
         self.damaged = True
         self.health -= 1
-        self.timer_invinsible.start()
-        self.timer_flash.start()
+
+        if (self.health <= 0):
+            self.dead = True
+            self.velocity.y = -self.initial_jump_velocity * 0.6
+        else:
+            self.timer_invinsible.start()
+            self.timer_flash.start()
 
     def enter_arena(self):
-        self.reset()
         self.entered_arena = True
 
     def __update_health(self, delta_time):
-        if (not self.damaged):
+        if (not self.damaged or self.dead):
             return
 
         self.timer_invinsible.update(delta_time)
@@ -345,6 +359,9 @@ class Player(Actor):
             self.timer_invinsible.reset()
 
     def _update_input(self):
+        if (self.dead):
+            return
+
         if (pressing(InputType.LEFT) and not pressing(InputType.RIGHT)):
             self.acceleration.x = -self.lateral_acceleration
 
@@ -406,6 +423,9 @@ class Player(Actor):
 
     def _collision(self, scene_data):
         self._update_collision_rectangles()
+
+        if (self.dead):
+            return
 
         if (globals.debugging):
             for e in scene_data.entities:
@@ -569,7 +589,6 @@ class Block(Entity):
 class Boss(Entity):
     def __init__(self, x, y, width, height):
         super(Boss, self).__init__(x, y, width, height)
-
         self.total_health = 10000
         self.health = self.total_health
         self.dead = False
@@ -585,6 +604,11 @@ class Boss(Entity):
             self.health_bar_width + self.padding * 2,
             12 + self.padding * 2
         )
+
+    def reset(self):
+        self.health = self.total_health
+        self.health_bar = self.__update_health_bar()
+        self.dead = False
 
     def hit(self, damage):
         if (self.dead):
@@ -989,7 +1013,6 @@ class Octopus(Boss):
 
         self.left_arm = OctoArm(self, False)
         self.right_arm = OctoArm(self, True)
-
         self.blaster = OctoBlaster(self)
 
         self.stage = 0
@@ -1005,6 +1028,19 @@ class Octopus(Boss):
             self.width + 8 * 2,
             self.height + 8 * 2
         )
+
+    def reset(self):
+        self.left_arm = OctoArm(self, False)
+        self.right_arm = OctoArm(self, True)
+        self.blaster = OctoBlaster(self)
+
+        self.stage = 0
+        self.attacking = False
+        self.attack_started = False
+        self.attack_type = 0
+        self.timer_attack = Timer(2500)
+
+        super(Octopus, self).reset()
 
     def __update_timer(self, delta_time):
         if (self.attacking):
