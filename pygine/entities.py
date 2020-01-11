@@ -126,6 +126,144 @@ class Actor(Kinetic):
             "A class that inherits Actor did not implement the _update_input() method")
 
 
+class Gun(Entity):
+    def __init__(self, x, y):
+        super(Gun, self).__init__(x, y, 32, 16)
+        self.sprite = Sprite(self.x, self.y, SpriteType.NONE)
+        self.facing = Direction.LEFT
+
+        self.bullet_travel = 16 * 7
+        self.bullet_speed = 300
+        self.bullet_damage = 10
+
+        self.timer_frequency = Timer(250)
+        self.can_shoot = True
+
+    def face(self, direction):
+        self.facing = direction
+
+        if (self.facing == Direction.UP):
+            self.sprite.set_sprite(SpriteType.GUN_0_V)
+        else:
+            self.sprite.set_sprite(SpriteType.GUN_0_H)
+
+        if (self.facing == Direction.RIGHT):
+            self.sprite.flip_horizontally(True)
+        elif (self.facing == Direction.LEFT):
+            self.sprite.flip_horizontally(False)
+
+    def fire(self, x, y, extra_velocity, scene_data):
+        if (not self.can_shoot):
+            return
+
+        extra = 0
+        direction = 0
+
+        if (self.facing == Direction.LEFT or self.facing == Direction.RIGHT):
+            if (self.facing == Direction.LEFT):
+                direction = -1
+                if (extra_velocity < 0):
+                    extra = extra_velocity
+            else:
+                direction = 1
+                if (extra_velocity > 0):
+                    extra = extra_velocity
+
+            # Create Bullet
+            scene_data.entity_buffer.append(
+                Bullet(
+                    x, y,
+                    Vector2(direction * self.bullet_speed + extra, 0),
+                    self.bullet_travel,
+                    self.bullet_damage
+                )
+            )
+        else:
+            direction = -1
+            if (extra_velocity < 0):
+                extra = extra_velocity
+
+            # Create Bullet
+            scene_data.entity_buffer.append(
+                Bullet(
+                    x, y,
+                    Vector2(0, direction * self.bullet_speed + extra),
+                    self.bullet_travel,
+                    self.bullet_damage
+                )
+            )
+
+        self.can_shoot = False
+        self.timer_frequency.reset()
+        self.timer_frequency.start()
+
+    def set_location(self, x, y):
+        super(Gun, self).set_location(x, y)
+        self.sprite.set_location(self.x, self.y)
+
+    def update(self, delta_time, scene_data):
+        self.timer_frequency.update(delta_time)
+        if (self.timer_frequency.done):
+            self.can_shoot = True
+
+    def draw(self, surface):
+        self.sprite.draw(surface, CameraType.STATIC)
+
+
+class Bullet(Kinetic):
+    def __init__(self, x, y, velocity, travel, damage):
+        super(Bullet, self).__init__(x, y, 16, 16, 0)
+        self.sprite = Sprite(self.x, self.y, SpriteType.BULLET)
+        self.velocity = velocity
+
+        self.travel = travel
+        self.damage = damage
+
+        self.starting_x = x
+        self.starting_y = y
+
+    def set_location(self, x, y):
+        super(Bullet, self).set_location(x, y)
+        self.sprite.set_location(self.x, self.y)
+
+    def _collision(self, scene_data):
+        if (self.x + self.width < 0 or self.x > scene_data.scene_bounds.width):
+            self.remove = True
+
+    def update(self, delta_time, scene_data):
+
+        if (abs(self.x - self.starting_x) > self.travel or abs(self.y - self.starting_y) > self.travel):
+            self.remove = True
+
+        super(Bullet, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.DYNAMIC,
+                self.color
+            )
+        else:
+            self.sprite.draw(surface, CameraType.STATIC)
+
+
+class BasicGun(Gun):
+    def __init__(self, x, y):
+        super(BasicGun, self).__init__(x, y)
+
+        self.timer_frequency = Timer(150)
+
+        self.sprite.set_sprite(SpriteType.GUN_0_H)
+
+    def update(self, delta_time, scene_data):
+        super(BasicGun, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        super(BasicGun, self).draw(surface)
+
+
 class Player(Actor):
     def __init__(self, x, y):
         super(Player, self).__init__(x, y, 16, 32, 90)
@@ -173,25 +311,21 @@ class Player(Actor):
         self.entered_arena = True
 
     def _update_input(self):
-        if pressing(InputType.LEFT) and not pressing(InputType.RIGHT):
+        if (pressing(InputType.LEFT) and not pressing(InputType.RIGHT)):
             self.acceleration.x = -self.lateral_acceleration
-            if (self.velocity.x < -self.move_speed):
-                self.velocity.x = -self.move_speed
 
             if (self.sprite_flipped):
                 self.sprite.flip_horizontally(True)
                 self.sprite_flipped = False
 
-        if pressing(InputType.RIGHT) and not pressing(InputType.LEFT):
+        if (pressing(InputType.RIGHT) and not pressing(InputType.LEFT)):
             self.acceleration.x = self.lateral_acceleration
-            if (self.velocity.x > self.move_speed):
-                self.velocity.x = self.move_speed
 
             if (not self.sprite_flipped):
                 self.sprite.flip_horizontally(True)
                 self.sprite_flipped = True
 
-        if not pressing(InputType.LEFT) and not pressing(InputType.RIGHT):
+        if (not pressing(InputType.LEFT) and not pressing(InputType.RIGHT)):
             if (self.velocity.x != 0):
                 dir = -1 if self.velocity.x > 0 else 1
                 if (self.grounded):
@@ -210,6 +344,12 @@ class Player(Actor):
         if (self.jumping and self.velocity.y < -self.initial_jump_velocity / 2 and not pressing(InputType.A)):
             self.velocity.y = -self.initial_jump_velocity / 2
             self.jumping = False
+
+        if (self.velocity.x < -self.move_speed):
+            self.velocity.x = -self.move_speed
+
+        if (self.velocity.x > self.move_speed):
+            self.velocity.x = self.move_speed
 
     def __rectanlge_collision_logic(self, entity):
         # Bottom
@@ -301,21 +441,78 @@ class PlayerA(Player):
         super(PlayerA, self).__init__(x, y)
         self.sprite = Sprite(self.x - 9, self.y - 16, SpriteType.PLAYERA)
         # Character specific stuff here.
+        self.gun = BasicGun(self.x - 24, self.y + 8)
+        self.shooting_up = False
 
     def set_location(self, x, y):
         super(PlayerA, self).set_location(x, y)
         self.sprite.set_location(self.x - 9, self.y - 16)
 
-    def blast_em_logic(self):
-        pass
+        if (not self.shooting_up):
+            # Facing Left
+            if (not self.sprite_flipped):
+                self.gun.set_location(self.x - 24, self.y + 8)
+                self.gun.face(Direction.LEFT)
+            else:
+                self.gun.set_location(self.x + self.width - 4, self.y + 8)
+                self.gun.face(Direction.RIGHT)
+        else:
+            # Facing Left
+            if (not self.sprite_flipped):
+                self.gun.set_location(self.x - 14, self.y - 5)
+            else:
+                self.gun.set_location(self.x + 9, self.y - 5)
+
+            self.gun.face(Direction.UP)
+
+    def __blast_em_logic(self, scene_data):
+
+        self.shooting_up = False
+
+        if (pressing(InputType.UP)):
+            if (pressing(InputType.X)):
+                self.shooting_up = True
+
+                if (not self.sprite_flipped):
+                    self.gun.fire(
+                        self.x - 12,
+                        self.y - 16,
+                        self.velocity.y,
+                        scene_data
+                    )
+                else:
+                    self.gun.fire(
+                        self.x + 10,
+                        self.y - 16,
+                        self.velocity.y,
+                        scene_data
+                    )
+        else:
+            if (pressing(InputType.X)):
+                if (not self.sprite_flipped):
+                    self.gun.fire(
+                        self.x - 24, self.y + 9,
+                        self.velocity.x,
+                        scene_data
+                    )
+                else:
+                    self.gun.fire(
+                        self.x + self.width + 4,
+                        self.y + 9,
+                        self.velocity.x,
+                        scene_data)
 
     def update(self, delta_time, scene_data):
-        self.blast_em_logic()
+        self.__blast_em_logic(scene_data)
 
+        self.gun.update(delta_time, scene_data)
         super(PlayerA, self).update(delta_time, scene_data)
 
     def draw(self, surface):
         super(PlayerA, self).draw(surface)
+
+        if (not globals.debugging):
+            self.gun.draw(surface)
 
 
 class Block(Entity):
@@ -337,29 +534,550 @@ class Boss(Entity):
     def __init__(self, x, y, width, height):
         super(Boss, self).__init__(x, y, width, height)
 
-    def hit(self):
-        pass
+        self.total_health = 10000
+        self.health = self.total_health
+        self.dead = False
+
+        self.health_bar_width = 192
+        self.health_bar_position = Vector2((320 - 192) / 2, 8)
+        self.health_bar = self.__update_health_bar()
+
+        self.padding = 4
+        self.health_bar_backing = Rect(
+            self.health_bar_position.x - self.padding,
+            self.health_bar_position.y - self.padding,
+            self.health_bar_width + self.padding * 2,
+            12 + self.padding * 2
+        )
+
+    def hit(self, damage):
+        if (self.dead):
+            return
+
+        self.health -= damage
+        self.health_bar = self.__update_health_bar()
+
+        if (self.health <= 0):
+            self.dead = True
+
+    def __update_health_bar(self):
+        return Rect(
+            self.health_bar_position.x,
+            self.health_bar_position.y,
+            self.health * self.health_bar_width / self.total_health,
+            12
+        )
 
     def update(self, delta_time, scene_data):
         pass
 
     def draw(self, surface):
-        pass
+        # Draw health bar
+        draw_rectangle(
+            surface,
+            self.health_bar_backing,
+            CameraType.STATIC,
+            Color.WHITE
+        )
+        draw_rectangle(
+            surface,
+            self.health_bar_backing,
+            CameraType.STATIC,
+            Color.BLACK,
+            2
+        )
+        draw_rectangle(
+            surface,
+            self.health_bar,
+            CameraType.STATIC,
+            Color.RED
+        )
+
+
+class OctoArm(Kinetic):
+    def __init__(self, boss, is_right):
+        super(OctoArm, self).__init__(-128, 240 - 32 - 32, 128, 16, 0)
+
+        self.boss = boss
+        self.is_right = is_right
+
+        self.color = Color.GRASS_GREEN
+        self.sprite = Sprite(self.x, self.y - 32, SpriteType.OCTOPUS_ARM)
+        if (self.is_right):
+            self.set_location(320, self.y)
+            self.sprite.flip_horizontally(True)
+
+        self.attacking = False
+        self.attack_stage = 0
+
+        # Kinetic needs this
+        self.query_result = None
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
+    def set_location(self, x, y):
+        super(OctoArm, self).set_location(x, y)
+        if (not self.is_right):
+            self.sprite.set_location(self.x, self.y - 32)
+        else:
+            self.sprite.set_location(self.x - 16, self.y - 32)
+
+    def attack(self):
+        if (self.attacking):
+            return
+
+        self.attacking = True
+        self.attack_stage = 0
+
+        direction = -1 if self.is_right else 1
+        self.acceleration.x = 500 * direction
+
+    def _collision(self, scene_data):
+        self._update_collision_rectangles()
+
+        if (globals.debugging):
+            for e in scene_data.entities:
+                e.set_color(Color.WHITE)
+
+        self.area = Rect(
+            self.x - 16,
+            self.y - 16,
+            self.width + 16 * 2,
+            self.height + 16 * 2
+        )
+
+        if (not self.attacking):
+            return
+
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if (globals.debugging):
+                e.set_color(Color.RED)
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.boss.hit(e.damage * 0.1)
+                    e.remove = True
+
+    def __update_attack_logic(self):
+        if (not self.attacking):
+            return
+
+        extend = 64
+        if (self.attack_stage == 0):
+            if (
+                (not self.is_right and self.x + self.width > extend) or
+                (self.is_right and self.x < 320 - extend)
+            ):
+                self.acceleration.x = 0
+                self.velocity.x = 0
+
+                direction = -1 if self.is_right else 1
+                self.acceleration.x = 100 * direction
+                self.acceleration.y = -750
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 1):
+
+            if (self.y < 32):
+                self.acceleration.y = 0
+                self.velocity.y = 0
+
+                self.acceleration.y = 1000
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 2):
+            if (self.y > 240 - 32 - 32):
+                self.acceleration.y = 0
+                self.velocity.y = 0
+
+                direction = 1 if self.is_right else -1
+                self.acceleration.x = 300 * direction
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 3):
+            if (
+                (not self.is_right and self.x + self.width < 0) or
+                (self.is_right and self.x > 320)
+            ):
+                self.acceleration.x = 0
+                self.velocity.x = 0
+
+                self.attacking = False
+
+    def update(self, delta_time, scene_data):
+        self.__update_attack_logic()
+        super(OctoArm, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.STATIC,
+                self.color
+            )
+        else:
+            self.sprite.draw(surface, CameraType.STATIC)
+
+
+class OctoBlaster(Kinetic):
+    def __init__(self, boss):
+        super(OctoBlaster, self).__init__(-256, -256, 64, 64, 0)
+
+        self.boss = boss
+
+        self.color = Color.GRASS_GREEN
+
+        self.sprite = Sprite(self.x, self.y, SpriteType.OCTOPUS_GUN)
+
+        self.attacking = False
+        self.attack_stage = 0
+
+        self.wall = Direction.LEFT
+        self.timer_seek = Timer(1500)
+
+        self.timer_charge = Timer(500)
+
+        self.laser = Rect(self.x, self.y, 0, 0)
+        self.timer_laser = Timer(2000)
+
+        # Kinetic needs this
+        self.query_result = None
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
+    def set_location(self, x, y):
+        super(OctoBlaster, self).set_location(x, y)
+
+        if (self.wall == Direction.RIGHT):
+            self.sprite.set_location(self.x - 32, self.y)
+        elif (self.wall == Direction.LEFT):
+            self.sprite.set_location(self.x, self.y)
+
+    def attack(self):
+        if (self.attacking):
+            return
+
+        self.attacking = True
+        self.attack_stage = 0
+
+        side = randint(0, 1)
+        if (side == 3):
+            self.wall = Direction.UP
+
+        elif (side == 0):
+            self.wall = Direction.RIGHT
+            self.set_location(
+                320 + 128,
+                randint(16, 240 - 80)
+            )
+            self.sprite.set_sprite(SpriteType.OCTOPUS_GUN)
+            self.sprite.flip_horizontally(True)
+            self.acceleration.x = -175
+
+        elif (side == 1):
+            self.wall = Direction.LEFT
+            self.set_location(
+                -128,
+                randint(16, 240 - 80)
+            )
+            self.sprite.set_sprite(SpriteType.OCTOPUS_GUN)
+            self.acceleration.x = 175
+
+        self.timer_seek.start()
+
+    def _collision(self, scene_data):
+        self._update_collision_rectangles()
+
+        if (globals.debugging):
+            for e in scene_data.entities:
+                e.set_color(Color.WHITE)
+
+        self.area = Rect(
+            self.x - 16,
+            self.y - 16,
+            self.width + 16 * 2,
+            self.height + 16 * 2
+        )
+
+        if (not self.attacking):
+            return
+
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if (globals.debugging):
+                e.set_color(Color.RED)
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.boss.hit(e.damage * 0.1)
+                    e.remove = True
+
+    def __update_attack_logic(self, delta_time, scene_data):
+        if (not self.attacking):
+            return
+
+        extend = 48
+        if (self.attack_stage == 0):
+            if (
+                (self.wall == Direction.LEFT and self.x + self.width > extend) or
+                (self.wall == Direction.RIGHT and self.x < 320 - extend)
+            ):
+                self.acceleration.x = 0
+                self.velocity.x = 0
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 1):
+            self.timer_seek.update(delta_time)
+
+            if (not self.timer_seek.done):
+                padding = 10
+                if (
+                    self.y < scene_data.actor.y + scene_data.actor.height - padding and
+                    self.y + self.height > scene_data.actor.y + padding
+                ):
+                    self.acceleration.y = 0
+                    self.velocity.y *= 0.25
+                    self.attack_stage += 1
+                    self.timer_seek.reset()
+
+                    if (self.wall == Direction.LEFT):
+                        self.laser = Rect(
+                            self.x + 72, self.y + 6, 320 * 0.5, self.height)
+                    elif (self.wall == Direction.RIGHT):
+                        self.laser = Rect(self.x - 320 * 0.5, self.y +
+                                          6, 320 * 0.5, self.height)
+
+                else:
+                    self.acceleration.y = (scene_data.actor.y - self.y) * 0.6
+            else:
+                self.acceleration.y = 0
+                self.velocity.y *= 0.1
+                self.attack_stage += 1
+                self.timer_seek.reset()
+
+        elif (self.attack_stage == 2):
+            self.timer_charge.start()
+            self.timer_charge.update(delta_time)
+            if (self.timer_charge.done):
+                self.timer_charge.reset()
+
+                direction = -1 if self.wall == Direction.LEFT else 1
+                self.acceleration.x = direction * 30
+                self.velocity.y *= 0.5
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 3):
+            if (self.wall == Direction.LEFT):
+                self.laser = Rect(self.x + 72, self.y + 6,
+                                  320 * 0.5, self.height)
+            elif (self.wall == Direction.RIGHT):
+                self.laser = Rect(self.x - 320 * 0.5, self.y +
+                                  6, 320 * 0.5, self.height)
+
+            self.timer_laser.start()
+
+            self.timer_laser.update(delta_time)
+            if (self.timer_laser.done):
+                direction = -1 if self.wall == Direction.LEFT else 1
+                self.acceleration.x = direction * 100
+
+                self.timer_laser.reset()
+                self.attack_stage += 1
+
+        elif (self.attack_stage == 4):
+            if (
+                (self.wall == Direction.LEFT and self.x + self.width < -64) or
+                (self.wall == Direction.RIGHT and self.x > 320 + 64)
+            ):
+                self.acceleration = Vector2(0, 0)
+                self.velocity = Vector2(0, 0)
+
+                self.attacking = False
+
+    def update(self, delta_time, scene_data):
+        self.__update_attack_logic(delta_time, scene_data)
+        super(OctoBlaster, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.STATIC,
+                self.color
+            )
+        else:
+            self.sprite.draw(surface, CameraType.STATIC)
+
+            if (self.attack_stage == 3):
+                draw_rectangle(
+                    surface,
+                    self.laser,
+                    CameraType.STATIC,
+                    Color.RED
+                )
 
 
 class Octopus(Boss):
     def __init__(self):
-        super(Octopus, self).__init__(0, 0, 16, 16)
+        super(Octopus, self).__init__(96, 64, 128, 48)
         self.sprite_left = Sprite(0, 0, SpriteType.OCTOPUS)
         self.sprite_right = Sprite(160, 0, SpriteType.OCTOPUS)
         self.sprite_right.flip_horizontally(True)
 
+        self.left_arm = OctoArm(self, False)
+        self.right_arm = OctoArm(self, True)
+
+        self.blaster = OctoBlaster(self)
+
+        self.stage = 0
+        self.attacking = False
+        self.attack_started = False
+        self.attack_type = 0
+        self.timer_attack = Timer(2500)
+
+        self.query_result = None
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
+    def __update_timer(self, delta_time):
+        if (self.attacking):
+            return
+
+        self.timer_attack.start()
+        self.timer_attack.update(delta_time)
+        if (self.timer_attack.done):
+            self.attacking = True
+            self.timer_attack.reset()
+
+    def __strategize(self, scene_data):
+        if (not self.attacking or self.attack_started):
+            return
+
+        if (self.stage == 0):
+            if (randint(0, 9) < 4):
+                self.left_arm.attack()
+                self.right_arm.attack()
+            else:
+                if (
+                    scene_data.actor.x + scene_data.actor.width /
+                        2 < scene_data.scene_bounds.width * 0.5
+                ):
+                    self.left_arm.attack()
+                else:
+                    self.right_arm.attack()
+        else:
+            if (
+                scene_data.actor.x + scene_data.actor.width / 2 < scene_data.scene_bounds.width * 0.33 or
+                scene_data.actor.x + scene_data.actor.width /
+                    2 > scene_data.scene_bounds.width * 0.66
+            ):
+                if (randint(0, 9) < 6):
+                    self.left_arm.attack()
+                    self.right_arm.attack()
+                else:
+                    if (randint(0, 9) < 5):
+                        self.left_arm.attack()
+                    else:
+                        self.right_arm.attack()
+                self.attack_type = 0
+
+            else:
+                self.blaster.attack()
+                self.attack_type = 1
+
+        self.attack_started = True
+
+    def __await_attack_result(self):
+        if (not self.attack_started):
+            return
+
+        if (self.attack_type == 0):
+            if (not self.left_arm.attacking and not self.right_arm.attacking):
+                self.attack_started = False
+                self.attacking = False
+
+        elif (self.attack_type == 1):
+            if (not self.blaster.attacking):
+                self.attack_started = False
+                self.attacking = False
+
+    def __update_stage(self):
+        if (self.health < self.total_health * 0.5):
+            self.stage = 1
+            self.timer_attack.length = 1234
+        else:
+            self.stage = 0
+
+    def __collision(self, scene_data):
+
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.hit(e.damage)
+                    e.remove = True
+
     def update(self, delta_time, scene_data):
-        pass
+
+        self.__update_stage()
+
+        self.__update_timer(delta_time)
+        self.__strategize(scene_data)
+        self.__await_attack_result()
+
+        self.__collision(scene_data)
+
+        self.left_arm.update(delta_time, scene_data)
+        self.right_arm.update(delta_time, scene_data)
+        self.blaster.update(delta_time, scene_data)
 
     def draw(self, surface):
+        # Draw Body
         self.sprite_left.draw(surface, CameraType.STATIC)
         self.sprite_right.draw(surface, CameraType.STATIC)
+        # Draw Arms
+        self.left_arm.draw(surface)
+        self.right_arm.draw(surface)
+
+        self.blaster.draw(surface)
+
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.STATIC,
+                Color.BLUE
+            )
+
+        super(Octopus, self).draw(surface)
+
 
 class GolemPalm(Kinetic):
     def __init__(self, facing_left):
@@ -373,14 +1091,14 @@ class GolemPalm(Kinetic):
             self.sprite.flip_horizontally(True)
 
         # Kinetic needs this
-        self.query_result = None        
+        self.query_result = None
         self.area = Rect(
             self.x - 8,
             self.y - 8,
             self.width + 8 * 2,
             self.height + 8 * 2
         )
-    
+
     def set_location(self, x, y):
         super(GolemPalm, self).set_location(x, y)
         self.sprite.set_location(self.x, self.y)
@@ -426,7 +1144,7 @@ class GolemPalm(Kinetic):
 
 
 class GolemHand(Kinetic):
-    def __init__(self, attack_time, facing_left):
+    def __init__(self, boss, attack_time, facing_left):
         super(GolemHand, self).__init__(320, 0, 69, 59, 0)
         self.sprite = Sprite(0, 64, SpriteType.GOLEM_FIST)
         if (not facing_left):
@@ -446,11 +1164,14 @@ class GolemHand(Kinetic):
         self.attack_timer = Timer(attack_time, True)
         self.rest_timer = Timer(2500, False)
 
+        self.boss = boss
+        self.color = Color.TEAL
+
         self.velocity = Vector2(0, 0)
         self.acceleration = Vector2(0, 0)
 
         # Kinetic needs this
-        self.query_result = None        
+        self.query_result = None
         self.area = Rect(
             self.x - 8,
             self.y - 8,
@@ -517,6 +1238,18 @@ class GolemHand(Kinetic):
             if (globals.debugging):
                 e.set_color(Color.RED)
 
+        # Check collision against Kinetic stuff (ugly I know)
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.boss.hit(e.damage)
+                    e.remove = True
+
     def update(self, delta_time, scene_data):
         self.attack_timer.update(delta_time)
         self.rest_timer.update(delta_time)
@@ -538,11 +1271,19 @@ class GolemHand(Kinetic):
             if (self.y + self.height >= scene_data.scene_bounds.height - 32):
                 self.attack_finished = True
             self.attack()
-        
+
         super(GolemHand, self).update(delta_time, scene_data)
 
     def draw(self, surface):
-        self.sprite.draw(surface, CameraType.STATIC)
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.DYNAMIC,
+                self.color
+            )
+        else:
+            self.sprite.draw(surface, CameraType.STATIC)
 
 
 class Golem(Boss):
@@ -552,12 +1293,12 @@ class Golem(Boss):
         self.sprite_body_right = Sprite(80 + 5 * 16, 16, SpriteType.GOLEM_BODY)
         self.sprite_body_right.flip_horizontally(True)
 
-        self.right_hand = GolemHand(2500, False)
-        self.left_hand = GolemHand(4500, True)
+        self.right_hand = GolemHand(self, 2500, False)
+        self.left_hand = GolemHand(self, 4500, True)
         self.palms = []
         self.palm_timer = Timer(10000, True)
         self.palm_chance = 0.5
-        
+
     def update(self, delta_time, scene_data):
         self.palm_timer.update(delta_time)
         if (self.palm_timer.done):
@@ -582,3 +1323,5 @@ class Golem(Boss):
         self.left_hand.draw(surface)
         for p in self.palms:
             p.draw(surface)
+
+        super(Golem, self).draw(surface)

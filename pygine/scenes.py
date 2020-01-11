@@ -30,6 +30,9 @@ class SceneManager:
         return self.__current_scene
 
     def queue_next_scene(self, scene_type):
+        if (self.start_transition):
+            return
+
         self.__previous_scene = self.__current_scene
         self.__next_scene = self.__all_scenes[int(scene_type)]
         self.__setup_transition()
@@ -103,6 +106,8 @@ class SceneManager:
                     self.enter_transition.draw(surface)
             else:
                 self.enter_transition.draw(surface)
+                if (self.enter_transition.done):
+                    self.start_transition = False
 
     def draw(self, surface):
         assert (self.__current_scene != None), \
@@ -120,6 +125,8 @@ class SceneDataRelay(object):
         self.entity_bin = None
         self.kinetic_quad_tree = None
         self.actor = None
+
+        self.entity_buffer = []
 
     def set_scene_bounds(self, bounds):
         self.scene_bounds = bounds
@@ -253,6 +260,11 @@ class Scene(object):
             self.entities[i].update(delta_time, self.scene_data)
             if self.entities[i].remove:
                 del self.entities[i]
+
+        if (len(self.scene_data.entity_buffer) > 0):
+            for i in range(len(self.scene_data.entity_buffer)-1, -1, -1):
+                self.entities.append(self.scene_data.entity_buffer[i])
+            self.scene_data.entity_buffer = []
 
     def __update_triggers(self, delta_time):
         for t in self.triggers:
@@ -468,6 +480,11 @@ class BossB(BossBattle):
         )
 
         self.entities.append(Golem())
+
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
 
     def update(self, delta_time):
         super(BossB, self).update(delta_time)

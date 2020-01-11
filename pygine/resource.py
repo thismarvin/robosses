@@ -71,6 +71,13 @@ class SpriteType(IntEnum):
     GOLEM_BODY = 12
     GOLEM_CORE = 13
 
+    GUN_0_H = 24
+    GUN_0_V = 25
+    BULLET = 26
+
+    OCTOPUS_ARM = 27
+    OCTOPUS_GUN = 28
+
 
 class Sprite(PygineObject):
     def __init__(self, x, y, sprite_type=SpriteType.NONE):
@@ -153,6 +160,13 @@ class Sprite(PygineObject):
             self.__sprite_setup(0, 0, 160, 176)
             self.sprite_sheet = BOSS_SPRITES[0]
 
+        elif (self.type == SpriteType.OCTOPUS_ARM):
+            self.__sprite_setup(0, 192, 144, 64)
+            self.sprite_sheet = BOSS_SPRITES[0]
+        elif (self.type == SpriteType.OCTOPUS_GUN):
+            self.__sprite_setup(160, 176, 96, 80)
+            self.sprite_sheet = BOSS_SPRITES[0]
+
         elif (self.type == SpriteType.GOLEM_FIST):
             self.__sprite_setup(80, 0, 80, 64)
             self.sprite_sheet = BOSS_SPRITES[1]
@@ -165,6 +179,13 @@ class Sprite(PygineObject):
         elif (self.type == SpriteType.GOLEM_CORE):
             self.__sprite_setup(0, 0, 16, 16)
             self.sprite_sheet = BOSS_SPRITES[1]
+
+        elif (self.type == SpriteType.GUN_0_H):
+            self.__sprite_setup(64, 32, 26, 19)
+        elif (self.type == SpriteType.GUN_0_V):
+            self.__sprite_setup(64, 52, 19, 26)
+        elif (self.type == SpriteType.BULLET):
+            self.__sprite_setup(96, 32, 16, 16)
 
         self.__apply_changes_to_sprite()
 
