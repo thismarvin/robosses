@@ -4,6 +4,7 @@ from pygame import Rect
 from pygine.entities import *
 from pygine.input import InputType, pressed
 from pygine.maths import Vector2
+from pygine.sounds import play_song
 from pygine.structures import Quadtree, Bin
 from pygine.transitions import Pinhole, TransitionType
 from pygine.triggers import OnButtonPressTrigger
@@ -36,6 +37,8 @@ class SceneManager:
         self.__previous_scene = self.__current_scene
         self.__next_scene = self.__all_scenes[int(scene_type)]
         self.__setup_transition()
+
+        self.__next_scene.load_scene()
 
     def __reset(self):
         self.__all_scenes = []
@@ -78,7 +81,6 @@ class SceneManager:
 
     def __change_scenes(self):
         self.__current_scene = self.__next_scene
-        self.__current_scene.load_scene()
 
     def __update_input(self, delta_time):
         if pressed(InputType.RESET):
@@ -360,6 +362,8 @@ class Menu(Scene):
         ]
 
     def update(self, delta_time):
+        play_song("metalloid.wav", 0.5)
+
         super(Menu, self).update(delta_time)
 
     def draw(self, surface):
@@ -435,6 +439,8 @@ class BossBattle(Scene):
         self.release_timer.reset()
         self.release_timer.start()
 
+        play_song("mollusc.wav", 0.5)
+
     def _create_triggers(self):
         self.triggers = []
 
@@ -454,6 +460,8 @@ class BossBattle(Scene):
             self._create_arena()
             self.arena_setup = True
             self.release_timer.start()
+
+            play_song("mollusc.wav", 0.5)
         else:
             self._soft_reset()
 
@@ -468,7 +476,7 @@ class BossBattle(Scene):
             self.actor.enter_arena()
             self.player_released = True
 
-        if (self.actor.dead and self.actor.y > self.scene_bounds.height + 16):
+        if (self.actor.dead and self.actor.y > self.scene_bounds.height + 64):
             self._soft_reset()
 
         super(BossBattle, self).update(delta_time)
@@ -508,6 +516,9 @@ class BossA(BossBattle):
         )
 
     def update(self, delta_time):
+        if (self.octopus.health <= self.octopus.total_health * 0.5):
+            play_song("mollusc-fast.wav", 0.5)
+
         if (self.octopus.dead):
             self.manager.queue_next_scene(SceneType.MENU)
 
