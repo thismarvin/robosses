@@ -1175,7 +1175,8 @@ class Octopus(Boss):
 
 class GolemPalm(Kinetic):
     def __init__(self, boss, facing_left):
-        super(GolemPalm, self).__init__(320, 240 - 32 - 103 / 2, 71, 103 / 2, 0)
+        super(GolemPalm, self).__init__(320, 240 - 32 - 103 / 2, 48, 48, 0)
+        self.color = Color.OCEAN_BLUE
         self.sprite = Sprite(0, 64, SpriteType.GOLEM_PALM)
         self.velocity = Vector2(-100, 0)
         self.facing_left = facing_left
@@ -1197,7 +1198,7 @@ class GolemPalm(Kinetic):
 
     def set_location(self, x, y):
         super(GolemPalm, self).set_location(x, y)
-        self.sprite.set_location(self.x, self.y)
+        self.sprite.set_location(self.x - 16, self.y - 16)
 
     def __rectanlge_collision_logic(self, entity):
         pass
@@ -1243,7 +1244,15 @@ class GolemPalm(Kinetic):
         super(GolemPalm, self).update(delta_time, scene_data)
 
     def draw(self, surface):
-        self.sprite.draw(surface, CameraType.STATIC)
+        if (globals.debugging):
+            draw_rectangle(
+                surface,
+                self.bounds,
+                CameraType.STATIC,
+                self.color
+            )
+        else:
+            self.sprite.draw(surface, CameraType.STATIC)
 
 
 class GolemHand(Kinetic):
@@ -1402,7 +1411,7 @@ class GolemHand(Kinetic):
 
 class Golem(Boss):
     def __init__(self):
-        super(Golem, self).__init__(0, 0, 16, 16)
+        super(Golem, self).__init__(112, 32, 96, 16)
         self.sprite_body_left = Sprite(80, 16, SpriteType.GOLEM_BODY)
         self.sprite_body_right = Sprite(80 + 5 * 16, 16, SpriteType.GOLEM_BODY)
         self.sprite_body_right.flip_horizontally(True)
@@ -1412,6 +1421,24 @@ class Golem(Boss):
         self.palms = []
         self.palm_timer = Timer(10000, False)
         self.next_checkpoint = self.total_health * 0.75
+
+        self.query_result = None
+        self.area = Rect(
+            self.x - 8,
+            self.y - 8,
+            self.width + 8 * 2,
+            self.height + 8 * 2
+        )
+
+    def reset(self):
+        self.right_hand = GolemHand(self, 2500, False)
+        self.left_hand = GolemHand(self, 4500, True)
+        self.palms = []
+
+        self.palm_timer = Timer(10000, False)
+        self.next_checkpoint = self.total_health * 0.75
+
+        super(Golem, self).reset()
 
     def __change_stage(self):
         if (self.health < self.total_health * 0.25):
@@ -1437,7 +1464,20 @@ class Golem(Boss):
         if self.health < self.next_checkpoint:
             self.__change_stage()
 
+    def __collision(self, scene_data):
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
+
+        for e in self.query_result:
+            if e is self:
+                continue
+
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.hit(e.damage * 0.6)
+                    e.remove = True
+
     def update(self, delta_time, scene_data):
+        self.__collision(scene_data)
         self.__update_stage_change()
         self.palm_timer.update(delta_time)
         if (self.palm_timer.done):

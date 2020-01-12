@@ -400,7 +400,7 @@ class Select(Scene):
             OnButtonPressTrigger(
                 InputType.A,
                 Vector2(-128, -128),
-                SceneType.BOSSA
+                SceneType.BOSSB
             )
         ]
 
@@ -426,9 +426,11 @@ class BossBattle(Scene):
         self.release_timer = Timer(1000)
 
         self.initialized = False
+        self.complete = False
 
     def load_scene(self):
         self.initialized = False
+        self.complete = False
 
     def _reset(self):
         self.set_scene_bounds(
@@ -495,9 +497,7 @@ class BossA(BossBattle):
         super(BossA, self).__init__()
         self.background.set_sprite(SpriteType.BACKGROUND_0)
         self.release_timer = Timer(500)
-        self.octopus = Octopus()
-
-        self.complete = False
+        self.octopus = Octopus()        
 
     def _create_arena(self):
         self.entities.append(
@@ -542,7 +542,6 @@ class BossB(BossBattle):
         self.background.set_sprite(SpriteType.BACKGROUND_1)
 
         self.golem = Golem()
-        self.complete = False
 
     def _create_arena(self):
         self.entities.append(
@@ -560,6 +559,7 @@ class BossB(BossBattle):
 
     def _reset_arena(self):
         self.actor.reset()
+        self.golem.reset()
 
         self.actor.set_location(
             (self.scene_bounds.width - self.actor.width / 2) / 2,
