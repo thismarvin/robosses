@@ -9,6 +9,7 @@ from pygine import globals
 from pygine.input import InputType, pressed, pressing
 from pygine.maths import Vector2
 from pygine.resource import Sprite, SpriteType
+from pygine.sounds import play_sound
 from pygine.utilities import CameraType, Color, Timer
 from random import randint
 
@@ -197,6 +198,8 @@ class Gun(Entity):
         self.timer_frequency.reset()
         self.timer_frequency.start()
 
+        play_sound("shoot.wav", 0.15)
+
     def set_location(self, x, y):
         super(Gun, self).set_location(x, y)
         self.sprite.set_location(self.x, self.y)
@@ -334,9 +337,11 @@ class Player(Actor):
         if (self.health <= 0):
             self.dead = True
             self.velocity.y = -self.initial_jump_velocity * 0.6
+            play_sound("robot_dead.wav", 0.25)
         else:
             self.timer_invinsible.start()
             self.timer_flash.start()
+            play_sound("robot_hurt.wav", 1)        
 
     def enter_arena(self):
         self.entered_arena = True
@@ -391,6 +396,7 @@ class Player(Actor):
         if (self.grounded and not self.jumping and pressing(InputType.A)):
             self.velocity.y = -self.initial_jump_velocity
             self.jumping = True
+            play_sound("jump.wav", 0.5)
 
         if (self.jumping and self.velocity.y < -self.initial_jump_velocity / 2 and not pressing(InputType.A)):
             self.velocity.y = -self.initial_jump_velocity / 2
