@@ -1175,13 +1175,13 @@ class Octopus(Boss):
 
 class GolemPalm(Kinetic):
     def __init__(self, boss, facing_left):
-        super(GolemPalm, self).__init__(320, 240 - 32 - 103, 71, 103, 0)
+        super(GolemPalm, self).__init__(320, 240 - 32 - 103 / 2, 71, 103 / 2, 0)
         self.sprite = Sprite(0, 64, SpriteType.GOLEM_PALM)
         self.velocity = Vector2(-100, 0)
         self.facing_left = facing_left
         if (not facing_left):
             self.velocity.x = abs(self.velocity.x)
-            self.set_location(-71, 240 - 32 - 103)
+            self.set_location(-71, 240 - 32 - 103 / 2)
             self.sprite.flip_horizontally(True)
 
         # Kinetic needs this
@@ -1259,13 +1259,14 @@ class GolemHand(Kinetic):
         self.resting = False
         self.rising = False
 
-        self.seek_speed = 70
-        self.seek_ofs = 0  # 64 if facing_left else -64
+        self.seek_speed = 50
+        self.seek_ofs = 0
         self.seek_accel = 50  # lower = faster
         self.attack_accel = 500
         self.attack_speed = 300
         self.rising_speed = -30
         self.attack_timer = Timer(attack_time, True)
+        self.charge_timer = Timer(500, False)
         self.rest_timer = Timer(2500, False)
 
         self.boss = boss
@@ -1289,14 +1290,16 @@ class GolemHand(Kinetic):
 
     def attack(self):
         self.velocity.x = 0
-        self.velocity.y = self.attack_speed
-        self.acceleration.y = self.attack_accel
-        if (self.attack_finished):
-            self.attack_finished = False
-            self.acceleration.y = 0
-            self.resting = True
-            self.rest_timer.reset()
-            self.rest_timer.start()
+        if (self.charge_timer.done):
+            self.velocity.y = self.attack_speed
+            self.acceleration.y = self.attack_accel
+            if (self.attack_finished):
+                self.attack_finished = False
+                self.acceleration.y = 0
+                self.resting = True
+                self.rest_timer.reset()
+                self.rest_timer.start()
+                self.charge_timer.reset()
 
     def seek(self, delta_time, scene_data):
         centerPlayer = scene_data.actor.x + scene_data.actor.width / 2 + self.seek_ofs
@@ -1355,12 +1358,13 @@ class GolemHand(Kinetic):
                     e.remove = True
 
             if isinstance(e, Player):
-                if (self.bounds.colliderect(e.bounds)):
+                if (self.bounds.colliderect(e.bounds) and not self.attack_finished):
                     e.take_damage()
 
     def update(self, delta_time, scene_data):
         self.attack_timer.update(delta_time)
         self.rest_timer.update(delta_time)
+        self.charge_timer.update(delta_time)
 
         if (not self.attack_timer.done):
             self.seek(delta_time, scene_data)
@@ -1378,6 +1382,8 @@ class GolemHand(Kinetic):
         else:
             if (self.y + self.height >= scene_data.scene_bounds.height - 32):
                 self.attack_finished = True
+            if (not self.charge_timer.started):
+                self.charge_timer.start()
             self.attack()
 
         super(GolemHand, self).update(delta_time, scene_data)
@@ -1436,9 +1442,9 @@ class Golem(Boss):
         self.palm_timer.update(delta_time)
         if (self.palm_timer.done):
             if (random.random() < 0.5):
-                self.palms.append(GolemPalm(True))
+                self.palms.append(GolemPalm(self, True))
             else:
-                self.palms.append(GolemPalm(False))
+                self.palms.append(GolemPalm(self, False))
             self.palm_timer.reset()
             self.palm_timer.start()
 
