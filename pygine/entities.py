@@ -341,7 +341,7 @@ class Player(Actor):
         else:
             self.timer_invinsible.start()
             self.timer_flash.start()
-            play_sound("robot_hurt.wav", 1)        
+            play_sound("robot_hurt.wav", 1)
 
     def enter_arena(self):
         self.entered_arena = True
@@ -1174,7 +1174,7 @@ class Octopus(Boss):
 
 
 class GolemPalm(Kinetic):
-    def __init__(self, facing_left):
+    def __init__(self, boss, facing_left):
         super(GolemPalm, self).__init__(320, 240 - 32 - 103, 71, 103, 0)
         self.sprite = Sprite(0, 64, SpriteType.GOLEM_PALM)
         self.velocity = Vector2(-100, 0)
@@ -1192,6 +1192,8 @@ class GolemPalm(Kinetic):
             self.width + 8 * 2,
             self.height + 8 * 2
         )
+
+        self.boss = boss
 
     def set_location(self, x, y):
         super(GolemPalm, self).set_location(x, y)
@@ -1214,14 +1216,21 @@ class GolemPalm(Kinetic):
             self.height + 16 * 2
         )
 
-        self.query_result = scene_data.entity_quad_tree.query(self.area)
+        # Check collision against Kinetic stuff (ugly I know)
+        self.query_result = scene_data.kinetic_quad_tree.query(self.area)
 
         for e in self.query_result:
             if e is self:
                 continue
 
-            if (globals.debugging):
-                e.set_color(Color.RED)
+            if isinstance(e, Bullet):
+                if (self.bounds.colliderect(e.bounds)):
+                    self.boss.hit(e.damage)
+                    e.remove = True
+
+            if isinstance(e, Player):
+                if (self.bounds.colliderect(e.bounds)):
+                    e.take_damage()
 
     def update(self, delta_time, scene_data):
         if (self.facing_left):
@@ -1251,8 +1260,8 @@ class GolemHand(Kinetic):
         self.rising = False
 
         self.seek_speed = 70
-        self.seek_ofs = 0 #64 if facing_left else -64
-        self.seek_accel = 50 # lower = faster
+        self.seek_ofs = 0  # 64 if facing_left else -64
+        self.seek_accel = 50  # lower = faster
         self.attack_accel = 500
         self.attack_speed = 300
         self.rising_speed = -30
@@ -1345,6 +1354,10 @@ class GolemHand(Kinetic):
                     self.boss.hit(e.damage)
                     e.remove = True
 
+            if isinstance(e, Player):
+                if (self.bounds.colliderect(e.bounds)):
+                    e.take_damage()
+
     def update(self, delta_time, scene_data):
         self.attack_timer.update(delta_time)
         self.rest_timer.update(delta_time)
@@ -1409,7 +1422,7 @@ class Golem(Boss):
             self.next_checkpoint = self.total_health * 0.25
         elif (self.health < self.total_health * 0.75):
             # stage 1: enable palms
-            self.palms.append(GolemPalm(True))
+            self.palms.append(GolemPalm(self, True))
             self.palm_timer.reset()
             self.palm_timer.start()
             self.next_checkpoint = self.total_health * 0.5

@@ -40,6 +40,10 @@ class SceneManager:
 
         self.__next_scene.load_scene()
 
+    def move_actor_to_next_scene(self, actor):
+        self.__next_scene.actor = actor
+        self.__next_scene.entities.append(actor)
+
     def __reset(self):
         self.__all_scenes = []
         self.__current_scene = None
@@ -493,6 +497,8 @@ class BossA(BossBattle):
         self.release_timer = Timer(500)
         self.octopus = Octopus()
 
+        self.complete = False
+
     def _create_arena(self):
         self.entities.append(
             Block(0, self.scene_bounds.height -
@@ -519,8 +525,10 @@ class BossA(BossBattle):
         if (self.octopus.health <= self.octopus.total_health * 0.5):
             play_song("mollusc-fast.wav", 0.5)
 
-        if (self.octopus.dead):
-            self.manager.queue_next_scene(SceneType.MENU)
+        if (self.octopus.dead and not self.complete):
+            self.manager.queue_next_scene(SceneType.BOSSB)
+            self.manager.move_actor_to_next_scene(self.actor)
+            self.complete = True
 
         super(BossA, self).update(delta_time)
 
@@ -533,13 +541,25 @@ class BossB(BossBattle):
         super(BossB, self).__init__()
         self.background.set_sprite(SpriteType.BACKGROUND_1)
 
+        self.golem = Golem()
+        self.complete = False
+
     def _create_arena(self):
         self.entities.append(
             Block(0, self.scene_bounds.height -
                   32, self.scene_bounds.width, 32)
         )
 
-        self.entities.append(Golem())
+        self.entities.append(self.golem)
+
+        self.actor.reset()
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
+
+    def _reset_arena(self):
+        self.actor.reset()
 
         self.actor.set_location(
             (self.scene_bounds.width - self.actor.width / 2) / 2,
@@ -547,6 +567,13 @@ class BossB(BossBattle):
         )
 
     def update(self, delta_time):
+        if (self.golem.health <= self.golem.total_health * 0.5):
+            play_song("mollusc-fast.wav", 0.5)
+
+        if (self.golem.dead and not self.complete):
+            self.manager.queue_next_scene(SceneType.MENU)
+            self.complete = True
+
         super(BossB, self).update(delta_time)
 
     def draw(self, surface):
