@@ -20,15 +20,18 @@ def load_sound_paths():
     music.set_volume(0.80)
 
 
-def play_song(filename):
+def play_song(filename, volume=0.75):
     global current_song
     global MUSIC_PATH
     if filename != current_song:
         music.load(MUSIC_PATH + filename)
+        music.set_volume(volume)
         music.play(-1)
         current_song = filename
 
 
-def play_sound(filename):
+def play_sound(filename, volume=0.75):
     global SOUND_PATH
-    Sound(SOUND_PATH + filename).play()
+    sound = Sound(SOUND_PATH + filename)
+    sound.set_volume(volume)
+    sound.play()
