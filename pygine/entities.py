@@ -1440,7 +1440,7 @@ class Golem(Boss):
 
         super(Golem, self).reset()
 
-    def __change_stage(self):
+    def __change_stage(self, scene_data):
         if (self.health < self.total_health * 0.25):
             # final stage: faster smashes, even more palms
             self.palm_timer.length = 5500
@@ -1455,14 +1455,17 @@ class Golem(Boss):
             self.next_checkpoint = self.total_health * 0.25
         elif (self.health < self.total_health * 0.75):
             # stage 1: enable palms
-            self.palms.append(GolemPalm(self, True))
+            if (scene_data.actor.x + scene_data.actor.width * 0.5 > scene_data.scene_bounds.width * 0.5):
+                self.palms.append(GolemPalm(self, False))
+            else:
+                self.palms.append(GolemPalm(self, True))
             self.palm_timer.reset()
             self.palm_timer.start()
             self.next_checkpoint = self.total_health * 0.5
 
-    def __update_stage_change(self):
+    def __update_stage_change(self, scene_data):
         if self.health < self.next_checkpoint:
-            self.__change_stage()
+            self.__change_stage(scene_data)
 
     def __collision(self, scene_data):
         self.query_result = scene_data.kinetic_quad_tree.query(self.area)
@@ -1478,13 +1481,13 @@ class Golem(Boss):
 
     def update(self, delta_time, scene_data):
         self.__collision(scene_data)
-        self.__update_stage_change()
+        self.__update_stage_change(scene_data)
         self.palm_timer.update(delta_time)
         if (self.palm_timer.done):
-            if (random.random() < 0.5):
-                self.palms.append(GolemPalm(self, True))
-            else:
+            if (scene_data.actor.x + scene_data.actor.width * 0.5 > scene_data.scene_bounds.width / 2):
                 self.palms.append(GolemPalm(self, False))
+            else:
+                self.palms.append(GolemPalm(self, True))
             self.palm_timer.reset()
             self.palm_timer.start()
 
