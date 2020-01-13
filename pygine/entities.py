@@ -267,6 +267,22 @@ class BasicGun(Gun):
         super(BasicGun, self).draw(surface)
 
 
+class WhatGun(Gun):
+    def __init__(self, x, y):
+        super(WhatGun, self).__init__(x, y)
+
+        self.timer_frequency = Timer(100)
+        self.bullet_damage = 11
+
+        self.sprite.set_sprite(SpriteType.GUN_1_H)
+
+    def update(self, delta_time, scene_data):
+        super(WhatGun, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        super(WhatGun, self).draw(surface)
+
+
 class Player(Actor):
     def __init__(self, x, y):
         super(Player, self).__init__(x, y, 16, 32, 90)
@@ -565,6 +581,9 @@ class PlayerA(Player):
                         scene_data)
 
     def update(self, delta_time, scene_data):
+        if (not self.entered_arena):
+            return
+
         self.__blast_em_logic(scene_data)
 
         self.gun.update(delta_time, scene_data)
@@ -572,6 +591,104 @@ class PlayerA(Player):
 
     def draw(self, surface):
         super(PlayerA, self).draw(surface)
+
+        if (not globals.debugging):
+            self.gun.draw(surface)
+
+
+class PlayerB(Player):
+    def __init__(self, x, y):
+        super(PlayerB, self).__init__(x, y)
+        self.sprite = Sprite(self.x - 9, self.y - 16, SpriteType.PLAYERB)
+        # Character specific stuff here.
+        self.gun = WhatGun(self.x - 24, self.y + 8)
+        self.shooting_up = False
+
+        self.jump_height = 16 * 6 + 4
+        self.jump_duration = 0.5
+
+        self.gravity = 2 * self.jump_height / \
+            (self.jump_duration * self.jump_duration)
+
+        self.initial_jump_velocity = self.gravity * self.jump_duration
+        self.acceleration = Vector2(0, self.gravity)
+
+        self.lateral_acceleration = 600
+        self.friction = 30
+        self.drag = 30
+        self.move_speed = 300
+
+        self.total_health = 2
+        self.health = self.total_health
+
+    def set_location(self, x, y):
+        super(PlayerB, self).set_location(x, y)
+        self.sprite.set_location(self.x - 9, self.y - 16)
+
+        if (not self.shooting_up):
+            # Facing Left
+            if (not self.sprite_flipped):
+                self.gun.set_location(self.x - 24, self.y + 8)
+                self.gun.face(Direction.LEFT)
+            else:
+                self.gun.set_location(self.x + self.width - 4, self.y + 8)
+                self.gun.face(Direction.RIGHT)
+        else:
+            # Facing Left
+            if (not self.sprite_flipped):
+                self.gun.set_location(self.x - 14, self.y - 5)
+            else:
+                self.gun.set_location(self.x + 9, self.y - 5)
+
+            self.gun.face(Direction.UP)
+
+    def __blast_em_logic(self, scene_data):
+
+        self.shooting_up = False
+
+        if (pressing(InputType.UP)):
+            if (pressing(InputType.X)):
+                self.shooting_up = True
+
+                if (not self.sprite_flipped):
+                    self.gun.fire(
+                        self.x - 12,
+                        self.y - 16,
+                        self.velocity.y,
+                        scene_data
+                    )
+                else:
+                    self.gun.fire(
+                        self.x + 10,
+                        self.y - 16,
+                        self.velocity.y,
+                        scene_data
+                    )
+        else:
+            if (pressing(InputType.X)):
+                if (not self.sprite_flipped):
+                    self.gun.fire(
+                        self.x - 24, self.y + 9,
+                        self.velocity.x,
+                        scene_data
+                    )
+                else:
+                    self.gun.fire(
+                        self.x + self.width + 4,
+                        self.y + 9,
+                        self.velocity.x,
+                        scene_data)
+
+    def update(self, delta_time, scene_data):
+        if (not self.entered_arena):
+            return
+        self.__blast_em_logic(scene_data)
+
+        self.gun.update(delta_time, scene_data)
+        super(PlayerB, self).update(delta_time, scene_data)
+
+    def draw(self, surface):
+        super(PlayerB, self).draw(surface)
 
         if (not globals.debugging):
             self.gun.draw(surface)
@@ -773,6 +890,8 @@ class OctoArm(Kinetic):
                 self.acceleration.x = 300 * direction
                 self.attack_stage += 1
 
+                play_sound("smash.wav", 0.3)
+
         elif (self.attack_stage == 3):
             if (
                 (not self.is_right and self.x + self.width < 0) or
@@ -818,6 +937,7 @@ class OctoBlaster(Kinetic):
         self.timer_charge = Timer(500)
 
         self.laser = Rect(self.x, self.y, 0, 0)
+        self.laser_detail = Rect(self.x, self.y, 0, 0)
         self.timer_laser = Timer(2000)
 
         # Kinetic needs this
@@ -862,7 +982,7 @@ class OctoBlaster(Kinetic):
             self.wall = Direction.LEFT
             self.set_location(
                 -128,
-                randint(16, 240 - 80)
+                randint(16, 240 - 96)
             )
             self.sprite.set_sprite(SpriteType.OCTOPUS_GUN)
             self.acceleration.x = 175
@@ -904,6 +1024,26 @@ class OctoBlaster(Kinetic):
             if (self.laser.colliderect(scene_data.actor.bounds)):
                 scene_data.actor.take_damage()
 
+    def __update_laser(self):
+        if (self.wall == Direction.LEFT):
+            self.laser = Rect(
+                self.x + 72, self.y + 6,
+                320 * 0.5, self.height
+            )
+            self.laser_detail = Rect(
+                self.x + 72, self.y + 6 + 8,
+                320 * 0.5, 48
+            )
+        elif (self.wall == Direction.RIGHT):
+            self.laser = Rect(
+                self.x - 320 * 0.5, self.y +
+                6, 320 * 0.5, self.height
+            )
+            self.laser_detail = Rect(
+                self.x - 320 * 0.5, self.y +
+                6 + 8, 320 * 0.5, 48
+            )
+
     def __update_attack_logic(self, delta_time, scene_data):
         if (not self.attacking):
             return
@@ -932,12 +1072,7 @@ class OctoBlaster(Kinetic):
                     self.attack_stage += 1
                     self.timer_seek.reset()
 
-                    if (self.wall == Direction.LEFT):
-                        self.laser = Rect(
-                            self.x + 72, self.y + 6, 320 * 0.5, self.height)
-                    elif (self.wall == Direction.RIGHT):
-                        self.laser = Rect(self.x - 320 * 0.5, self.y +
-                                          6, 320 * 0.5, self.height)
+                    self.__update_laser()
 
                 else:
                     self.acceleration.y = (scene_data.actor.y - self.y) * 0.6
@@ -957,14 +1092,10 @@ class OctoBlaster(Kinetic):
                 self.acceleration.x = direction * 30
                 self.velocity.y *= 0.5
                 self.attack_stage += 1
+                self.__update_laser()
 
         elif (self.attack_stage == 3):
-            if (self.wall == Direction.LEFT):
-                self.laser = Rect(self.x + 72, self.y + 6,
-                                  320 * 0.5, self.height)
-            elif (self.wall == Direction.RIGHT):
-                self.laser = Rect(self.x - 320 * 0.5, self.y +
-                                  6, 320 * 0.5, self.height)
+            self.__update_laser()
 
             self.timer_laser.start()
 
@@ -1006,7 +1137,13 @@ class OctoBlaster(Kinetic):
                     surface,
                     self.laser,
                     CameraType.STATIC,
-                    Color.RED
+                    Color.SKY_BLUE
+                )
+                draw_rectangle(
+                    surface,
+                    self.laser_detail,
+                    CameraType.STATIC,
+                    Color.WHITE
                 )
 
 
@@ -1025,7 +1162,7 @@ class Octopus(Boss):
         self.attacking = False
         self.attack_started = False
         self.attack_type = 0
-        self.timer_attack = Timer(2500)
+        self.timer_attack = Timer(1750)
 
         self.query_result = None
         self.area = Rect(
@@ -1044,7 +1181,7 @@ class Octopus(Boss):
         self.attacking = False
         self.attack_started = False
         self.attack_type = 0
-        self.timer_attack = Timer(2500)
+        self.timer_attack = Timer(1750)
 
         super(Octopus, self).reset()
 
@@ -1121,7 +1258,7 @@ class Octopus(Boss):
     def __update_stage(self):
         if (self.health < self.total_health * 0.5):
             self.stage = 1
-            self.timer_attack.length = 1234
+            self.timer_attack.length = 800
         else:
             self.stage = 0
 
@@ -1198,7 +1335,7 @@ class GolemPalm(Kinetic):
 
     def set_location(self, x, y):
         super(GolemPalm, self).set_location(x, y)
-        self.sprite.set_location(self.x - 16, self.y - 16)
+        self.sprite.set_location(self.x - 16, self.y)
 
     def __rectanlge_collision_logic(self, entity):
         pass
@@ -1303,6 +1440,7 @@ class GolemHand(Kinetic):
             self.velocity.y = self.attack_speed
             self.acceleration.y = self.attack_accel
             if (self.attack_finished):
+                
                 self.attack_finished = False
                 self.acceleration.y = 0
                 self.resting = True
@@ -1326,7 +1464,10 @@ class GolemHand(Kinetic):
     def __rectanlge_collision_logic(self, entity):
         if self.collision_rectangles[1].colliderect(entity.bounds) and self.velocity.y > 0:
             self.set_location(self.x, entity.bounds.top - self.bounds.height)
+            if (not self.attack_finished):
+                play_sound("smash.wav", 0.3)
             self.attack_finished = True
+            
 
     def _collision(self, scene_data):
         self._update_collision_rectangles()
@@ -1374,6 +1515,9 @@ class GolemHand(Kinetic):
         self.attack_timer.update(delta_time)
         self.rest_timer.update(delta_time)
         self.charge_timer.update(delta_time)
+
+        if (scene_data.actor == None):
+            return
 
         if (not self.attack_timer.done):
             self.seek(delta_time, scene_data)

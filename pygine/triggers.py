@@ -12,6 +12,9 @@ class Trigger(PygineObject):
         self.end_location = end_location
         self.triggered = False
 
+    def reset(self):
+        self.triggered = False
+
     def _queue_next_scene(self, manager):
         manager.queue_next_scene(self.next_scene)
 

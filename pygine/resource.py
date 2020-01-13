@@ -60,6 +60,10 @@ def __load_layers():
     BACKGROUNDS.append(pygame.image.load(
         path + "select.png").convert()
     )
+    BACKGROUNDS.append(pygame.image.load(
+        path + "lore.png").convert()
+    )
+
 
 
 class SpriteType(IntEnum):
@@ -83,10 +87,14 @@ class SpriteType(IntEnum):
 
     GUN_0_H = 24
     GUN_0_V = 25
+    GUN_1_H = 30
+    GUN_1_V = 31
     BULLET = 26
 
     OCTOPUS_ARM = 27
     OCTOPUS_GUN = 28    
+
+    LORE = 69
 
 
 class Sprite(PygineObject):
@@ -153,6 +161,10 @@ class Sprite(PygineObject):
             self.__sprite_setup(0, 0, 320, 240)
             self.sprite_sheet = BACKGROUNDS[1]
 
+        elif (self.type == SpriteType.LORE):
+            self.__sprite_setup(0, 0, 320, 240)
+            self.sprite_sheet = BACKGROUNDS[2]
+
         elif (self.type == SpriteType.PLAYERA):
             self.__sprite_setup(0, 32, 32, 48)
         elif (self.type == SpriteType.PLAYERB):
@@ -196,6 +208,12 @@ class Sprite(PygineObject):
             self.__sprite_setup(64, 32, 26, 19)
         elif (self.type == SpriteType.GUN_0_V):
             self.__sprite_setup(64, 52, 19, 26)
+
+        elif (self.type == SpriteType.GUN_1_H):
+            self.__sprite_setup(128, 32, 26, 19)
+        elif (self.type == SpriteType.GUN_1_V):
+            self.__sprite_setup(128, 52, 19, 26)
+
         elif (self.type == SpriteType.BULLET):
             self.__sprite_setup(96, 32, 16, 16)
 
