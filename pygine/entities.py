@@ -1276,6 +1276,8 @@ class Octopus(Boss):
                     e.remove = True
 
     def update(self, delta_time, scene_data):
+        if (scene_data.actor == None):
+            return
 
         self.__update_stage()
 
@@ -1624,6 +1626,9 @@ class Golem(Boss):
                     e.remove = True
 
     def update(self, delta_time, scene_data):
+        if (scene_data.actor == None):
+            return
+
         self.__collision(scene_data)
         self.__update_stage_change(scene_data)
         self.palm_timer.update(delta_time)
