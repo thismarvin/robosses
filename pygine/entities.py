@@ -1412,8 +1412,8 @@ class GolemHand(Kinetic):
 class Golem(Boss):
     def __init__(self):
         super(Golem, self).__init__(112, 32, 96, 16)
-        self.sprite_body_left = Sprite(80, 16, SpriteType.GOLEM_BODY)
-        self.sprite_body_right = Sprite(80 + 5 * 16, 16, SpriteType.GOLEM_BODY)
+        self.sprite_body_left = Sprite(80, 0, SpriteType.GOLEM_BODY)
+        self.sprite_body_right = Sprite(80 + 5 * 16, 0, SpriteType.GOLEM_BODY)
         self.sprite_body_right.flip_horizontally(True)
 
         self.right_hand = GolemHand(self, 2500, False)

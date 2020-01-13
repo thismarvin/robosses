@@ -350,8 +350,7 @@ class Menu(Scene):
         self.entities = []
 
         self.sprites = [
-            Sprite((self.scene_bounds.width - 144) / 2,
-                   (self.scene_bounds.height - 32) / 2, SpriteType.TITLE)
+            Sprite(0, 0, SpriteType.TITLE)
         ]
 
         self.shapes = []
@@ -388,10 +387,7 @@ class Select(Scene):
 
         self.entities = []
         self.sprites = [
-            Sprite((self.scene_bounds.width - 208) / 2,
-                   (self.scene_bounds.height - 32) / 4, SpriteType.SELECT),
-            Sprite((self.scene_bounds.width - 32) / 2,
-                   (self.scene_bounds.height - 48) / 2, SpriteType.PLAYERA),
+            Sprite(0, 0, SpriteType.SELECT)
         ]
         self.shapes = []
 
@@ -400,7 +396,7 @@ class Select(Scene):
             OnButtonPressTrigger(
                 InputType.A,
                 Vector2(-128, -128),
-                SceneType.BOSSB
+                SceneType.BOSSA
             )
         ]
 
