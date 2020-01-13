@@ -4,6 +4,7 @@ from pygame import Rect
 from pygine.entities import *
 from pygine.input import InputType, pressed
 from pygine.maths import Vector2
+from pygine.sounds import play_song
 from pygine.structures import Quadtree, Bin
 from pygine.transitions import Pinhole, TransitionType
 from pygine.triggers import OnButtonPressTrigger
@@ -14,9 +15,10 @@ from random import randint
 class SceneType(IntEnum):
     MENU = 0
     SELECT = 1
-    BOSSA = 2
-    BOSSB = 3
-    FINALBOSS = 4
+    LORE = 2
+    BOSSA = 3
+    BOSSB = 4
+    FINALBOSS = 5
 
 
 class SceneManager:
@@ -29,10 +31,27 @@ class SceneManager:
     def get_current_scene(self):
         return self.__current_scene
 
+    def hail_mary(self):
+        pass
+
     def queue_next_scene(self, scene_type):
+        if (self.start_transition):
+            return
+
         self.__previous_scene = self.__current_scene
         self.__next_scene = self.__all_scenes[int(scene_type)]
         self.__setup_transition()
+
+        self.__next_scene.load_scene()
+
+    def move_actor_to_next_scene(self, actor):
+        # if (self.__current_scene != self.__all_scenes[1]):
+        #    self.__current_scene.entities.remove(actor)
+
+        self.__next_scene.actor = actor
+        self.__next_scene.entities.append(actor)
+
+        self.__current_scene.actor = None
 
     def __reset(self):
         self.__all_scenes = []
@@ -54,6 +73,7 @@ class SceneManager:
         self.__all_scenes = []
         self.__add_scene(Menu())
         self.__add_scene(Select())
+        self.__add_scene(Lore())
         self.__add_scene(BossA())
         self.__add_scene(BossB())
         self.__add_scene(FinalBoss())
@@ -74,6 +94,8 @@ class SceneManager:
         self.start_transition = True
 
     def __change_scenes(self):
+        for t in self.__next_scene.triggers:
+            t.reset()
         self.__current_scene = self.__next_scene
 
     def __update_input(self, delta_time):
@@ -103,6 +125,8 @@ class SceneManager:
                     self.enter_transition.draw(surface)
             else:
                 self.enter_transition.draw(surface)
+                if (self.enter_transition.done):
+                    self.start_transition = False
 
     def draw(self, surface):
         assert (self.__current_scene != None), \
@@ -277,6 +301,9 @@ class Scene(object):
             self.camera.get_viewport_top_left().x - Scene.VIEWPORT_BUFFER,
             self.camera.get_viewport_top_left().y - Scene.VIEWPORT_BUFFER)
 
+    def load_scene(self):
+        pass
+
     def update(self, delta_time):
         self.__update_spatial_partitioning()
         self.scene_data.update(
@@ -335,8 +362,7 @@ class Menu(Scene):
         self.entities = []
 
         self.sprites = [
-            Sprite((self.scene_bounds.width - 144) / 2,
-                   (self.scene_bounds.height - 32) / 2, SpriteType.TITLE)
+            Sprite(0, 0, SpriteType.TITLE)
         ]
 
         self.shapes = []
@@ -351,6 +377,8 @@ class Menu(Scene):
         ]
 
     def update(self, delta_time):
+        play_song("metalloid.wav", 0.5)
+
         super(Menu, self).update(delta_time)
 
     def draw(self, surface):
@@ -363,7 +391,13 @@ class Select(Scene):
         self.setup(False)
 
         # TEMP
-        self.relay_actor(PlayerA(-128, -128))
+        #self.relay_actor(PlayerA(-128, -128))
+
+        self.player_index = 0
+        self.player_selected = False
+
+    def load_scene(self):
+        self.player_selected = False
 
     def _reset(self):
         self.set_scene_bounds(
@@ -371,27 +405,94 @@ class Select(Scene):
 
         self.entities = []
         self.sprites = [
-            Sprite((self.scene_bounds.width - 208) / 2,
-                   (self.scene_bounds.height - 32) / 4, SpriteType.SELECT),
-            Sprite((self.scene_bounds.width - 32) / 2,
-                   (self.scene_bounds.height - 48) / 2, SpriteType.PLAYERA),
+            Sprite(0, 0, SpriteType.SELECT)
         ]
         self.shapes = []
 
     def _create_triggers(self):
         self.triggers = [
-            OnButtonPressTrigger(
-                InputType.A,
-                Vector2(-128, -128),
-                SceneType.BOSSB
-            )
+
         ]
 
     def update(self, delta_time):
+        # TEMP
+        #self.actor.set_location(-128, -128)
+
+        if (pressed(InputType.RIGHT)):
+            self.player_index = self.player_index + 1 if self.player_index < 1 else 0
+
+        if (pressed(InputType.LEFT)):
+            self.player_index = self.player_index - 1 if self.player_index > 0 else 1
+
+        if (pressing(InputType.A) and not self.player_selected and self.manager.start_transition == False):
+            self.player_selected = True
+
+            if (self.player_index == 0):
+                next_scene = self.manager.get_scene(SceneType.LORE)
+                next_scene.relay_actor(PlayerA(-128, -128))
+                self.manager.queue_next_scene(SceneType.LORE)
+
+            elif(self.player_index == 1):
+                next_scene = self.manager.get_scene(SceneType.LORE)
+                next_scene.relay_actor(PlayerB(-128, -128))
+                self.manager.queue_next_scene(SceneType.LORE)
+
         super(Select, self).update(delta_time)
 
     def draw(self, surface):
         super(Select, self).draw(surface)
+
+        if (self.player_index == 0):
+            draw_rectangle(surface, Rect(65, 104, 30, 30),
+                           CameraType.STATIC, Color.BLACK)
+        elif (self.player_index == 1):
+            draw_rectangle(surface, Rect(25, 104, 30, 30),
+                           CameraType.STATIC, Color.BLACK)
+
+
+class Lore(Scene):
+    def __init__(self):
+        super(Lore, self).__init__()
+        self.setup(False)
+
+        self.stop = False
+
+    def load_scene(self):
+        self.stop = False
+
+    def _reset(self):
+        self.set_scene_bounds(
+            Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
+
+        self.entities = []
+        self.sprites = [
+            Sprite(0, 0, SpriteType.LORE)
+        ]
+        self.shapes = []
+
+    def _create_triggers(self):
+        self.triggers = [
+
+        ]
+
+    def update(self, delta_time):
+        # TEMP
+        #self.actor.set_location(-128, -128)
+
+        if (pressing(InputType.A) and not self.stop and self.manager.start_transition == False):
+
+            self.stop = True
+
+            next_scene = self.manager.get_scene(SceneType.BOSSA)
+            next_scene.relay_actor(self.entities[0])
+            self.manager.queue_next_scene(SceneType.BOSSA)
+
+            del self.entities[0]
+
+        super(Lore, self).update(delta_time)
+
+    def draw(self, surface):
+        super(Lore, self).draw(surface)
 
 
 class BossBattle(Scene):
@@ -405,12 +506,28 @@ class BossBattle(Scene):
         self.player_released = False
         self.release_timer = Timer(1000)
 
+        self.initialized = False
+        self.complete = False
+
+    def load_scene(self):
+        self.initialized = False
+        self.complete = False
+
     def _reset(self):
         self.set_scene_bounds(
             Rect(0, 0, Camera.BOUNDS.width, Camera.BOUNDS.height))
         self.entities = []
         self.sprites = []
         self.shapes = []
+
+    def _soft_reset(self):
+        self._reset_arena()
+        self.player_released = False
+        self.release_timer.reset()
+        self.release_timer.start()
+        self.complete = False
+
+        play_song("mollusc.wav", 0.5)
 
     def _create_triggers(self):
         self.triggers = []
@@ -419,16 +536,43 @@ class BossBattle(Scene):
         raise NotImplementedError(
             "A class that inherits BossBattle did not implement the _create_arena() method")
 
-    def update(self, delta_time):
+    def _reset_arena(self):
+        raise NotImplementedError(
+            "A class that inherits BossBattle did not implement the _reset_arena() method")
+
+    def __initialize_arena(self):
+        if (self.initialized):
+            return
+
         if (not self.arena_setup):
             self._create_arena()
-            self.release_timer.start()
             self.arena_setup = True
+            self.release_timer.start()
+            play_song("mollusc.wav", 0.5)
+        else:
+            self._soft_reset()
+
+        self.initialized = True
+
+    def update(self, delta_time):
+
+        self.__initialize_arena()
 
         self.release_timer.update(delta_time)
         if (not self.player_released and self.release_timer.done):
             self.actor.enter_arena()
             self.player_released = True
+
+        if (not self.complete and self.actor.dead and self.actor.y > self.scene_bounds.height + 64):
+            self._soft_reset()
+
+        total = 0
+        for e in self.entities:
+            if isinstance(e, Player):
+                total += 1
+                if (total >= 2):
+                    e.remove = True
+                    break
 
         super(BossBattle, self).update(delta_time)
 
@@ -442,6 +586,7 @@ class BossA(BossBattle):
         super(BossA, self).__init__()
         self.background.set_sprite(SpriteType.BACKGROUND_0)
         self.release_timer = Timer(500)
+        self.octopus = Octopus()
 
     def _create_arena(self):
         self.entities.append(
@@ -449,7 +594,16 @@ class BossA(BossBattle):
                   32, self.scene_bounds.width, 32)
         )
 
-        self.entities.append(Octopus())
+        self.entities.append(self.octopus)
+
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
+
+    def _reset_arena(self):
+        self.actor.reset()
+        self.octopus.reset()
 
         self.actor.set_location(
             (self.scene_bounds.width - self.actor.width / 2) / 2,
@@ -457,7 +611,20 @@ class BossA(BossBattle):
         )
 
     def update(self, delta_time):
+
         super(BossA, self).update(delta_time)
+
+        if (self.octopus.health <= self.octopus.total_health * 0.5):
+            play_song("mollusc-fast.wav", 0.5)
+
+        if (self.octopus.dead and not self.complete):
+            self.manager.queue_next_scene(SceneType.BOSSB)
+
+            self.entities.remove(self.actor)
+
+            self.manager.move_actor_to_next_scene(self.actor)
+
+            self.complete = True
 
     def draw(self, surface):
         super(BossA, self).draw(surface)
@@ -468,16 +635,44 @@ class BossB(BossBattle):
         super(BossB, self).__init__()
         self.background.set_sprite(SpriteType.BACKGROUND_1)
 
+        self.golem = Golem()
+
     def _create_arena(self):
         self.entities.append(
             Block(0, self.scene_bounds.height -
                   32, self.scene_bounds.width, 32)
         )
 
-        self.entities.append(Golem())
+        self.entities.append(self.golem)
+
+        self.actor.reset()
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
+
+    def _reset_arena(self):
+        self.actor.reset()
+        self.golem.reset()
+
+        self.actor.set_location(
+            (self.scene_bounds.width - self.actor.width / 2) / 2,
+            -128
+        )
 
     def update(self, delta_time):
+
         super(BossB, self).update(delta_time)
+
+        if (self.golem.health <= self.golem.total_health * 0.5):
+            play_song("mollusc-fast.wav", 0.5)
+
+        if (self.golem.dead and not self.complete):
+            self.manager.queue_next_scene(SceneType.MENU)
+
+            self.entities.remove(self.actor)
+            self.actor = None
+            self.complete = True
 
     def draw(self, surface):
         super(BossB, self).draw(surface)

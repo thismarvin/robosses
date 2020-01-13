@@ -10,11 +10,18 @@ class Trigger(PygineObject):
         super(Trigger, self).__init__(x, y, width, height)
         self.next_scene = next_scene
         self.end_location = end_location
+        self.triggered = False
+
+    def reset(self):
+        self.triggered = False
 
     def _queue_next_scene(self, manager):
         manager.queue_next_scene(self.next_scene)
 
     def _move_entity_to_next_scene(self, entity, manager):
+        if (self.triggered):
+            return
+
         next_scene = manager.get_scene(self.next_scene)
         current_scene = manager.get_current_scene()
 
@@ -26,6 +33,8 @@ class Trigger(PygineObject):
 
         current_scene.entities.remove(entity)
         entity.set_location(self.end_location.x, self.end_location.y)
+
+        self.triggered = True
 
     def update(self, delta_time, scene_data, manager):
         raise NotImplementedError(

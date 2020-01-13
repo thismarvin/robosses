@@ -14,6 +14,7 @@ TEXT_SHEET = None
 BOSS_BACKGROUNDS = []
 BOSS_SPRITES = []
 
+BACKGROUNDS = []
 
 def load_content():
     global SPRITE_SHEET
@@ -51,6 +52,19 @@ def __load_layers():
     BOSS_SPRITES.append(pygame.image.load(
         path + "boss_2_sprites.png").convert_alpha())
 
+    path = os.path.dirname(os.path.abspath(__file__)) + \
+        "/assets/sprites/"
+    BACKGROUNDS.append(pygame.image.load(
+        path + "title.png").convert()
+    )
+    BACKGROUNDS.append(pygame.image.load(
+        path + "select.png").convert()
+    )
+    BACKGROUNDS.append(pygame.image.load(
+        path + "lore.png").convert()
+    )
+
+
 
 class SpriteType(IntEnum):
     NONE = 0
@@ -71,10 +85,16 @@ class SpriteType(IntEnum):
     GOLEM_BODY = 12
     GOLEM_CORE = 13
 
-
     GUN_0_H = 24
     GUN_0_V = 25
+    GUN_1_H = 30
+    GUN_1_V = 31
     BULLET = 26
+
+    OCTOPUS_ARM = 27
+    OCTOPUS_GUN = 28    
+
+    LORE = 69
 
 
 class Sprite(PygineObject):
@@ -135,9 +155,15 @@ class Sprite(PygineObject):
             self.sprite_sheet = TEXT_SHEET
 
         elif (self.type == SpriteType.TITLE):
-            self.__sprite_setup(0, 0, 144, 32)
+            self.__sprite_setup(0, 0, 320, 240)
+            self.sprite_sheet = BACKGROUNDS[0]
         elif (self.type == SpriteType.SELECT):
-            self.__sprite_setup(0, 96, 208, 32)
+            self.__sprite_setup(0, 0, 320, 240)
+            self.sprite_sheet = BACKGROUNDS[1]
+
+        elif (self.type == SpriteType.LORE):
+            self.__sprite_setup(0, 0, 320, 240)
+            self.sprite_sheet = BACKGROUNDS[2]
 
         elif (self.type == SpriteType.PLAYERA):
             self.__sprite_setup(0, 32, 32, 48)
@@ -155,7 +181,14 @@ class Sprite(PygineObject):
             self.sprite_sheet = BOSS_BACKGROUNDS[2]
 
         elif (self.type == SpriteType.OCTOPUS):
-            self.__sprite_setup(0, 0, 160, 176)
+            self.__sprite_setup(0, 0, 160, 192)
+            self.sprite_sheet = BOSS_SPRITES[0]
+
+        elif (self.type == SpriteType.OCTOPUS_ARM):
+            self.__sprite_setup(0, 192, 144, 64)
+            self.sprite_sheet = BOSS_SPRITES[0]
+        elif (self.type == SpriteType.OCTOPUS_GUN):
+            self.__sprite_setup(160, 176, 96, 80)
             self.sprite_sheet = BOSS_SPRITES[0]
 
         elif (self.type == SpriteType.GOLEM_FIST):
@@ -175,6 +208,12 @@ class Sprite(PygineObject):
             self.__sprite_setup(64, 32, 26, 19)
         elif (self.type == SpriteType.GUN_0_V):
             self.__sprite_setup(64, 52, 19, 26)
+
+        elif (self.type == SpriteType.GUN_1_H):
+            self.__sprite_setup(128, 32, 26, 19)
+        elif (self.type == SpriteType.GUN_1_V):
+            self.__sprite_setup(128, 52, 19, 26)
+
         elif (self.type == SpriteType.BULLET):
             self.__sprite_setup(96, 32, 16, 16)
 
